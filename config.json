@@ -1,0 +1,31 @@
+{
+  "twitch_api": {
+    "client_id": "",
+    "oauth_token": "",
+    "channel_name": ""
+  },
+  "stream_settings": {
+    "stream_key": "",
+    "rtmp_url": "rtmp://live-fra.twitch.tv/app/{STREAM_KEY}"
+  },
+  "ffmpeg": {
+    "font_file": "",
+    "font_position": "bottom_center",
+    "font_size": 24,
+    "font_color": "#FFFFFF",
+    "box_color": "#000000",
+    "box_alpha": 0.5,
+    "encoder": "libx264",
+    "stream_mode": "transcode",
+    "video_bitrate": "6000k",
+    "audio_bitrate": "160k",
+    "preset": "veryfast",
+    "resolution": "1920x1080",
+    "framerate": "60"
+  },
+  "twitch_bot": {
+    "bot_nick": "",
+    "bot_token": "",
+    "channel_nick": ""
+  }
+}

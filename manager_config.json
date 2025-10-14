@@ -1,0 +1,10 @@
+{
+  "port": 5000,
+  "title_prefix": "",
+  "overlay_prefix": "Now Playing:",
+  "language": "de",
+  "video_directories": [
+    "videos"
+  ],
+  "thumbnail_scale": "320:-1"
+}

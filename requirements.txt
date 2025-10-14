@@ -1,0 +1,11 @@
+# Flask für das Web-Interface
+flask
+
+# Requests für API-Aufrufe (z.B. an Twitch)
+requests
+
+# Colorama für farbige Konsolenausgaben im Streamer
+colorama
+
+# psutil für plattformunabhängige Prozesssteuerung
+psutil
