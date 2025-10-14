@@ -670,33 +670,41 @@ def remove_from_playlist():
 
     return redirect(url_for('index', active_tab='playlist', edit_playlist=editing_playlist_id))
 
-# Fügen Sie diese Funktion bei den anderen Helfer-Funktionen ein
+# Ersetze die check_for_updates-Funktion
+
 def check_for_updates():
-    """Prüft auf eine neue Version der Anwendung."""
-    # WICHTIG: Ersetze dies mit der URL, wo deine Remote-Versionsdatei liegen wird
-    REMOTE_VERSION_URL = "https://DEINE_DOMAIN.DE/streamer/version.json" 
+    """Prüft auf eine neue Version und gibt IMMER die lokale Version zurück."""
+    REMOTE_VERSION_URL = "https://hub.zeibig.me/version.json" 
+    local_version = '0.0.0' # Fallback-Wert
     
     try:
         # Lese lokale Version
         with open('version.json', 'r', encoding='utf-8') as f:
             local_version = json.load(f).get('version', '0.0.0')
 
-        # Frage Remote-Version ab (mit Timeout, falls der Server nicht erreichbar ist)
+        # Standard-Rückgabewert, falls die Prüfung fehlschlägt
+        update_info = {"update_available": False, "current_version": local_version}
+
+        # Frage Remote-Version ab
         response = requests.get(REMOTE_VERSION_URL, timeout=5)
-        response.raise_for_status() # Löst einen Fehler aus, wenn die Seite nicht 200 OK ist
-        remote_version = response.json().get('version', '0.0.0')
+        response.raise_for_status()
+        remote_version_data = response.json()
+        remote_version = remote_version_data.get('version', '0.0.0')
 
         # Vergleiche die Versionen
         if remote_version > local_version:
-            return {
+            update_info = {
                 "update_available": True,
                 "current_version": local_version,
                 "new_version": remote_version
             }
+        
+        return update_info
+
     except Exception as e:
         print(f"Fehler bei der Update-Prüfung: {e}")
-    
-    return {"update_available": False}
+        # Gib auch im Fehlerfall die lokale Version zurück
+        return {"update_available": False, "current_version": local_version}
 
 
 @app.route('/save_rotation', methods=['POST'])
