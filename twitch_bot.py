@@ -4,30 +4,42 @@ import json
 import time
 import requests
 from colorama import Fore, init
+import gettext
+
+# --- i18n Setup Block (Already correct) ---
+try:
+    with open('manager_config.json', 'r', encoding='utf-8') as f:
+        lang = json.load(f).get('language', 'de')
+except (FileNotFoundError, json.JSONDecodeError):
+    lang = 'de'
+
+translation = gettext.translation('messages', localedir='translations', languages=[lang], fallback=True)
+_ = translation.gettext
+# --- End of Block ---
 
 init(autoreset=True)
 
-# --- Konstanten ---
+# --- Constants ---
 CONFIG_FILE = 'config.json'
 COMMANDS_FILE = 'commands.json'
 SESSION_FILE = 'session.json'
-MANAGER_CONFIG_FILE = 'manager_config.json' # Neu
+MANAGER_CONFIG_FILE = 'manager_config.json' # New
 SERVER = "irc.chat.twitch.tv"
 PORT = 6667
 
-# --- Helfer-Funktionen ---
+# --- Helper Functions ---
 def load_config_file(filename):
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        print(f"{Fore.RED}Warnung: {filename} nicht gefunden oder fehlerhaft.")
+        print(f"{Fore.RED}" + _("Warnung: %(filename)s nicht gefunden oder fehlerhaft.", filename=filename))
         return {}
 
 def send_message(sock, message):
     channel = load_config_file(CONFIG_FILE).get('twitch_bot', {}).get('channel_nick')
     if channel and message:
-        print(f"{Fore.MAGENTA}<-- BOT SENDET: {message}")
+        print(f"{Fore.MAGENTA}<-- {_('BOT SENDET')}: {message}")
         sock.send(f"PRIVMSG #{channel} :{message}\r\n".encode('utf-8'))
 
 def parse_tags(tag_string):
@@ -37,11 +49,11 @@ def parse_tags(tag_string):
         tags[key] = value
     return tags
 
-# --- Aktionen ---
+# --- Actions ---
 def handle_stream_control(sock, action):
-    # ... (Diese Funktion bleibt unverändert) ...
+    # ... (This function remains unchanged) ...
     command = action.get('command')
-    print(f"{Fore.YELLOW}Aktion 'stream_control' wird ausgeführt: {command}")
+    print(f"{Fore.YELLOW}{_('Aktion \'stream_control\' wird ausgeführt')}: {command}")
     try:
         with open(SESSION_FILE, 'r+', encoding='utf-8') as f:
             session_data = json.load(f)
@@ -60,23 +72,24 @@ def handle_stream_control(sock, action):
             f.seek(0)
             json.dump(session_data, f, indent=2)
             f.truncate()
-        print(f"{Fore.YELLOW}Signal '{command}' erfolgreich in {SESSION_FILE} geschrieben.")
+        print(Fore.YELLOW + _("Signal '%(command)s' erfolgreich in %(file)s geschrieben.", command=command, file=SESSION_FILE))
         return True
     except Exception as e:
-        print(f"{Fore.RED}Fehler beim Schreiben der {SESSION_FILE}: {e}")
+        print(f"{Fore.RED}" + _("Fehler beim Schreiben der %(file)s: ", file=SESSION_FILE) + f"{e}")
         return False
 
-def handle_chat_reply(sock, action, context, api_url): # Nimmt jetzt api_url als Argument
+def handle_chat_reply(sock, action, context, api_url): # Takes api_url as an argument
     message_template = action.get('message', '')
-    print(f"{Fore.YELLOW}Aktion 'chat_reply' wird ausgeführt.")
+    print(f"{Fore.YELLOW}{_('Aktion \'chat_reply\' wird ausgeführt.')}")
+    na_string = _("N/A") # Translatable fallback value
     try:
-        response = requests.get(api_url, timeout=2) # Verwendet die dynamische URL
+        response = requests.get(api_url, timeout=2) # Uses the dynamic URL
         if response.status_code == 200:
             api_data = response.json()
-            message_template = message_template.replace('{now_playing.title}', api_data.get('now_playing', {}).get('title', 'N/A'))
-            message_template = message_template.replace('{playlist.name}', api_data.get('playlist', {}).get('name', 'N/A'))
+            message_template = message_template.replace('{now_playing.title}', api_data.get('now_playing', {}).get('title', na_string))
+            message_template = message_template.replace('{playlist.name}', api_data.get('playlist', {}).get('name', na_string))
     except requests.RequestException:
-        print(f"{Fore.RED}Fehler: API unter {api_url} nicht erreichbar.")
+        print(f"{Fore.RED}{_('Fehler: API unter %(url)s nicht erreichbar.', url=api_url)}")
     message_template = message_template.replace('{user}', context.get('display-name', ''))
     send_message(sock, message_template)
     return True
@@ -87,17 +100,17 @@ def main():
     manager_config = load_config_file(MANAGER_CONFIG_FILE)
     
     if not all(k in bot_config for k in ['bot_nick', 'bot_token', 'channel_nick']):
-        print(f"{Fore.RED}FEHLER: Bot-Konfiguration in {CONFIG_FILE} unvollständig.")
+        print(f"{Fore.RED}{_('FEHLER')}: " + _("Bot-Konfiguration in %(file)s unvollständig.", file=CONFIG_FILE))
         time.sleep(10)
         return
         
     port = manager_config.get('port', 5000)
     api_url = f"http://127.0.0.1:{port}/api/now_playing"
-    print(f"{Fore.CYAN}API-Endpunkt wird auf {api_url} erwartet.")
+    print(f"{Fore.CYAN}" + _("API-Endpunkt wird auf %(url)s erwartet.", url=api_url))
     
     commands = load_config_file(COMMANDS_FILE)
     if not commands:
-        print(f"{Fore.YELLOW}Keine Befehle in {COMMANDS_FILE} gefunden. Bot hört nur zu.")
+        print(f"{Fore.YELLOW}" + _("Keine Befehle in %(file)s gefunden. Bot hört nur zu.", file=COMMANDS_FILE))
     
     command_cooldowns = {cmd: 0 for cmd in commands}
 
@@ -107,7 +120,7 @@ def main():
     sock.send(f"NICK {bot_config['bot_nick']}\n".encode('utf-8'))
     sock.send("CAP REQ :twitch.tv/tags\r\n".encode('utf-8'))
     sock.send(f"JOIN #{bot_config['channel_nick']}\n".encode('utf-8'))
-    print(f"Bot '{bot_config['bot_nick']}' ist Kanal '#{bot_config['channel_nick']}' beigetreten.")
+    print(_("Bot '%(bot_name)s' ist Kanal '#%(channel_name)s' beigetreten.", bot_name=bot_config['bot_nick'], channel_name=bot_config['channel_nick']))
 
     buffer = ""
     while True:
@@ -134,6 +147,7 @@ def main():
                     with open('chat.log', 'a', encoding='utf-8') as f:
                         f.write(log_line)
                     
+                    # This line logs the raw chat message; it should not be translated.
                     print(f"{Fore.GREEN}{display_name}: {Fore.WHITE}{message}")
 
                     # Befehls-Verarbeitung
@@ -162,10 +176,10 @@ def main():
                             break
 
         except (socket.timeout, ConnectionResetError):
-            print(f"{Fore.RED}Verbindung verloren. Skript wird beendet.")
+            print(f"{Fore.RED}{_('Verbindung verloren. Skript wird beendet.')}")
             break
         except Exception as e:
-            print(f"{Fore.RED}Unerwarteter Fehler: {e}")
+            print(f"{Fore.RED}{_('Unerwarteter Fehler')}: {e}")
             break
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
-# web_manager.py - Korrigierte Version
-import uuid
+import sys
 import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import uuid
 import csv
 import json
 import shutil
@@ -10,13 +11,16 @@ import subprocess
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory, session
 from werkzeug.utils import secure_filename
 import glob
-import sys
 import platform
 import signal
 import psutil
 from collections import deque
 from datetime import datetime, timedelta
 import requests
+from flask_babel import Babel, _
+from flask import g
+from token_manager import exchange_code_for_token, save_tokens_to_config
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FFMPEG_EXE = os.path.join(BASE_DIR, 'ffmpeg', 'bin', 'ffmpeg.exe')
@@ -24,7 +28,6 @@ FFPROBE_EXE = os.path.join(BASE_DIR, 'ffmpeg', 'bin', 'ffprobe.exe')
 PYTHON_EXE = os.path.join(BASE_DIR, 'python_embed', 'python.exe')
 
 # --- Configuration ---
-# old Version VIDEO_DIR = 'videos'
 WATCH_DIR = '_neu_'
 THUMBNAIL_DIR = 'thumbnails'
 FONTS_DIR = 'fonts'
@@ -36,11 +39,97 @@ METADATA_CACHE_JSON = 'metadata_cache.json'
 VALID_EXTENSIONS = ('.mp4', '.mkv', '.mov', '.avi', '.flv')
 VALID_FONT_EXTENSIONS = ('.ttf', '.otf')
 
+# --- App and i18n Initialization ---
 app = Flask(__name__)
 app.secret_key = 'your_very_secret_key_for_flash_messages'
 
+# This is a regular function now, without the "@babel" decorator
+def get_locale():
+    """Ermittelt die aktive Sprache aus der Konfigurationsdatei."""
+    try:
+        if not hasattr(g, 'manager_config'):
+            with open('manager_config.json', 'r', encoding='utf-8') as f:
+                g.manager_config = json.load(f)
+        return g.manager_config.get('language', 'de')
+    except (FileNotFoundError, json.JSONDecodeError):
+        return 'de'
+
+# Initialize Babel and pass the function directly
+babel = Babel(app, locale_selector=get_locale)
+app.config['BABEL_TRANSLATION_DIRECTORIES'] = 'translations'
+
 # In-memory cache for API data
 api_cache = {'last_played': None, 'current_path': None}
+
+@app.route('/connect_twitch')
+def connect_twitch():
+    """Leitet den Benutzer zur Twitch-Autorisierungsseite weiter."""
+    try:
+        with open(CONFIG_JSON, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        with open(MANAGER_CONFIG_JSON, 'r', encoding='utf-8') as f:
+            manager_config = json.load(f)
+
+        client_id = config.get('twitch_api', {}).get('client_id')
+        port = manager_config.get('port', 5000) # Port aus der manager_config lesen
+
+        if not client_id:
+            flash(_("Fehler: Zuerst muss eine Client-ID in der Streamer-Config gespeichert werden."), "error")
+            return redirect(url_for('index', active_tab='settings'))
+    except (FileNotFoundError, json.JSONDecodeError):
+        flash(_("Fehler: Konnte Konfigurationsdateien nicht laden."), "error")
+        return redirect(url_for('index', active_tab='settings'))
+
+    # URL dynamisch zusammenbauen
+    redirect_uri = f"https://127.0.0.1:{port}/twitch/callback"
+    scopes = 'channel:manage:broadcast'
+
+    auth_url = (f'https://id.twitch.tv/oauth2/authorize?response_type=code&client_id={client_id}&redirect_uri={redirect_uri}&scope={scopes}')
+    return redirect(auth_url)
+
+@app.route('/twitch/callback')
+def twitch_callback():
+    """Verarbeitet die Rückkehr von der Twitch-Autorisierung."""
+    code = request.args.get('code')
+    if not code:
+        flash(_("Autorisierung fehlgeschlagen oder vom Benutzer abgelehnt."), "error")
+        return redirect(url_for('index', active_tab='settings'))
+
+    try:
+        with open(CONFIG_JSON, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        with open(MANAGER_CONFIG_JSON, 'r', encoding='utf-8') as f:
+            manager_config = json.load(f)
+
+        client_id = config.get('twitch_api', {}).get('client_id')
+        client_secret = config.get('twitch_api', {}).get('client_secret')
+        port = manager_config.get('port', 5000)
+
+        if not client_id or not client_secret:
+            flash(_("Fehler: Client-ID und Client Secret müssen zuerst in der Config gespeichert werden."), "error")
+            return redirect(url_for('index', active_tab='settings'))
+
+    except (FileNotFoundError, json.JSONDecodeError):
+        flash(_("Fehler: Konnte Konfigurationsdateien nicht laden."), "error")
+        return redirect(url_for('index', active_tab='settings'))
+
+    # URL dynamisch zusammenbauen
+    redirect_uri = f"https://127.0.0.1:{port}/twitch/callback"
+
+    # URL an die Funktion übergeben
+    token_data = exchange_code_for_token(code, client_id, client_secret, redirect_uri)
+
+    if token_data and 'access_token' in token_data:
+        if save_tokens_to_config(token_data):
+            flash(_("Erfolgreich mit Twitch verbunden! Die Tokens wurden gespeichert."), "success")
+        else:
+            flash(_("Fehler beim Speichern der Tokens."), "error")
+    else:
+        flash(_("Fehler: Konnte die Tokens nicht von Twitch erhalten. Überprüfe die Konsolenausgabe."), "error")
+
+    return redirect(url_for('index', active_tab='settings'))
+
+
 
 #Import Videos
 @app.route('/sync_library', methods=['POST'])
@@ -50,12 +139,12 @@ def sync_library():
         with open(MANAGER_CONFIG_JSON, 'r', encoding='utf-8') as f:
             manager_config = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        flash("Manager-Konfiguration nicht gefunden.", "error")
+        flash(_("Manager-Konfiguration nicht gefunden."), "error")
         return redirect(url_for('index', active_tab='library'))
 
     video_dirs = manager_config.get('video_directories', [])
     if not video_dirs:
-        flash("Keine Video-Verzeichnisse in der Manager-Konfiguration festgelegt.", "warning")
+        flash(_("Keine Video-Verzeichnisse in der Manager-Konfiguration festgelegt."), "warning")
         return redirect(url_for('index', active_tab='library'))
 
     videos_db = load_videos_db()
@@ -83,9 +172,9 @@ def sync_library():
     if new_videos_found > 0:
         with open('videos.json', 'w', encoding='utf-8') as f:
             json.dump(videos_db, f, indent=4)
-        flash(f"{new_videos_found} neue(s) Video(s) wurde(n) zur Bibliothek hinzugefügt.", "success")
+        flash(_("%(count)s neue(s) Video(s) wurde(n) zur Bibliothek hinzugefügt.", count=new_videos_found), "success")
     else:
-        flash("Keine neuen Videos in den konfigurierten Verzeichnissen gefunden.", "info")
+        flash(_("Keine neuen Videos in den konfigurierten Verzeichnissen gefunden."), "info")
 
     return redirect(url_for('index', active_tab='library'))
 
@@ -160,7 +249,7 @@ def check_watch_folder():
     
     # Prüfen, ob überhaupt ein Ziel-Ordner konfiguriert ist
     if not video_dirs:
-        flash("Fehler: Kein Video-Ordner in der Manager-Konfiguration festgelegt. Import nicht möglich.", "error")
+        flash(_("Fehler: Kein Video-Ordner in der Manager-Konfiguration festgelegt. Import nicht möglich."), "error")
         return False
 
     # Wir nehmen den ERSTEN Ordner aus der Liste als Ziel für neue Videos
@@ -213,10 +302,10 @@ def create_playlist_from_selection():
     new_name_base = request.form.get('new_playlist_name')
 
     if not video_ids_to_add:
-        flash("Keine Videos zum Erstellen der Playlist ausgewählt.", "warning")
+        flash(_("Keine Videos zum Erstellen der Playlist ausgewählt."), "warning")
         return redirect(url_for('index', active_tab='library'))
     if not new_name_base:
-        flash("Bitte gib einen Namen für die neue Playlist an.", "error")
+        flash(_("Bitte gib einen Namen für die neue Playlist an."), "error")
         return redirect(url_for('index', active_tab='library'))
 
     new_filename = "".join(c for c in new_name_base if c.isalnum() or c in (' ', '.', '_', '-')).rstrip()
@@ -225,7 +314,7 @@ def create_playlist_from_selection():
     new_playlist_path = os.path.join('playlists', new_filename)
 
     if os.path.exists(new_playlist_path):
-        flash(f"Eine Playlist mit dem Namen '{new_filename}' existiert bereits.", "error")
+        flash(_("Eine Playlist mit dem Namen '%(filename)s' existiert bereits.", filename=new_filename), "error")
         return redirect(url_for('index', active_tab='library'))
 
     videos_db = load_videos_db()
@@ -252,12 +341,12 @@ def create_playlist_from_selection():
         # Optional: Setze die neue Playlist als aktiv im Editor
         # This part seems to have been removed or changed, we can leave it out for now.
 
-        flash(f"Playlist '{new_filename}' wurde mit {len(video_ids_to_add)} Videos erfolgreich erstellt!", "success")
+        flash(_("Playlist '%(filename)s' wurde mit %(count)s Videos erfolgreich erstellt!", filename=new_filename, count=len(video_ids_to_add)), "success")
 
     except Exception as e:
-        flash(f"Fehler beim Erstellen der Playlist: {e}", "error")
+        flash(_("Fehler beim Erstellen der Playlist: %(error)s", error=e), "error")
 
-    return redirect(url_for('index', active_tab='playlist', edit_playlist=new_playlist_id)) 
+    return redirect(url_for('index', active_tab='playlist', edit_playlist=new_playlist_id))
  
 @app.route('/add_to_playlist', methods=['POST'])
 def add_to_playlist():
@@ -266,10 +355,10 @@ def add_to_playlist():
     target_playlist = request.form.get('playlist_select_target')
 
     if not video_ids_to_add:
-        flash("Keine Videos zum Hinzufügen ausgewählt.", "warning")
+        flash(_("Keine Videos zum Hinzufügen ausgewählt."), "warning")
         return redirect(url_for('index', active_tab='library'))
     if not target_playlist:
-        flash("Keine Ziel-Playlist ausgewählt.", "error")
+        flash(_("Keine Ziel-Playlist ausgewählt."), "error")
         return redirect(url_for('index', active_tab='library'))
 
     target_playlist_path = os.path.join('playlists', target_playlist)
@@ -296,9 +385,9 @@ def add_to_playlist():
                     added_count += 1
 
     if added_count > 0:
-        flash(f"{added_count} Video(s) wurden zur Playlist '{target_playlist}' hinzugefügt.", "success")
+        flash(_("%(count)s Video(s) wurden zur Playlist '%(playlist)s' hinzugefügt.", count=added_count, playlist=target_playlist), "success")
     else:
-        flash("Die ausgewählten Videos sind bereits in der Playlist vorhanden.", "info")
+        flash(_("Die ausgewählten Videos sind bereits in der Playlist vorhanden."), "info")
 
     return redirect(url_for('index', active_tab='library'))
     
@@ -311,9 +400,9 @@ def skip_video():
         with open('session.json', 'r', encoding='utf-8') as f: session_data = json.load(f)
         session_data['force_restart'] = True
         with open('session.json', 'w', encoding='utf-8') as f: json.dump(session_data, f, indent=2)
-        flash("Signal 'Nächster Titel' gesendet.", "info")
+        flash(_("Signal 'Nächster Titel' gesendet."), "info")
     except Exception as e:
-        flash(f"Fehler beim Senden des Signals: {e}", "error")
+        flash(_("Fehler beim Senden des Signals: %(error)s", error=e), "error")
     return redirect(url_for('index', active_tab='playlist'))
 
 
@@ -341,9 +430,9 @@ def restart_playlist():
         # Sende das Signal für einen sofortigen Neustart
         session_data['force_restart'] = True
         with open('session.json', 'w', encoding='utf-8') as f: json.dump(session_data, f, indent=2)
-        flash("Signal 'Playlist Neustart' gesendet.", "info")
+        flash(_("Signal 'Playlist Neustart' gesendet."), "info")
     except Exception as e:
-        flash(f"Fehler beim Senden des Signals: {e}", "error")
+        flash(_("Fehler beim Senden des Signals: %(error)s", error=e), "error")
     return redirect(url_for('index', active_tab='playlist'))
     
     
@@ -355,14 +444,14 @@ def rename_video():
     new_basename_without_ext = request.form.get('new_name')
 
     if not video_id or not new_basename_without_ext:
-        flash("Fehlende Informationen für die Umbenennung.", "error")
+        flash(_("Fehlende Informationen für die Umbenennung."), "error")
         return redirect(url_for('index', active_tab='library'))
 
     videos_db = load_videos_db()
     video_info = videos_db.get(video_id)
 
     if not video_info:
-        flash("Video nicht in der Datenbank gefunden.", "error")
+        flash(_("Video nicht in der Datenbank gefunden."), "error")
         return redirect(url_for('index', active_tab='library'))
 
     try:
@@ -376,11 +465,11 @@ def rename_video():
         new_path = os.path.join(directory, new_basename)
 
         if old_path == new_path:
-            flash("Der neue Name ist identisch mit dem alten.", "info")
+            flash(_("Der neue Name ist identisch mit dem alten."), "info")
             return redirect(url_for('index', active_tab='library'))
 
         if os.path.exists(new_path):
-            flash(f"Eine Datei mit dem Namen '{new_basename}' existiert bereits.", "error")
+            flash(_("Eine Datei mit dem Namen '%(filename)s' existiert bereits.", filename=new_basename), "error")
             return redirect(url_for('index', active_tab='library'))
 
         # 1. Videodatei umbenennen
@@ -400,10 +489,10 @@ def rename_video():
         with open('videos.json', 'w', encoding='utf-8') as f:
             json.dump(videos_db, f, indent=4)
 
-        flash(f"Video erfolgreich in '{new_basename}' umbenannt.", "success")
+        flash(_("Video erfolgreich in '%(filename)s' umbenannt.", filename=new_basename), "success")
 
     except Exception as e:
-        flash(f"Fehler beim Umbenennen: {e}", "error")
+        flash(_("Fehler beim Umbenennen: %(error)s", error=e), "error")
 
     return redirect(url_for('index', active_tab='library'))
 
@@ -431,7 +520,7 @@ def is_streamer_running():
 def start_streamer():
     """Startet das stream_v3.py Skript und trennt dessen Logs von den FFmpeg-Logs."""
     if is_streamer_running():
-        flash("Der Streamer-Prozess läuft bereits!", "warning")
+        flash(_("Der Streamer-Prozess läuft bereits!"), "warning")
         return redirect(url_for('index', active_tab='process'))
 
     print("Starte Streamer-Skript (stream_v3.py) mit getrennten Logs...")
@@ -462,17 +551,17 @@ def start_streamer():
         with open('streamer.pid', 'w') as f:
             f.write(str(process.pid))
             
-        flash("Streamer-Skript wurde erfolgreich gestartet!", "success")
+        flash(_("Streamer-Skript wurde erfolgreich gestartet!"), "success")
         time.sleep(2)
     except Exception as e:
-        flash(f"Fehler beim Starten des Streamer-Skripts: {e}", "error")
+        flash(_("Fehler beim Starten des Streamer-Skripts: %(error)s", error=e), "error")
         
     return redirect(url_for('index', active_tab='process'))
 
 @app.route('/get_ffmpeg_log_content')
 def get_ffmpeg_log_content():
     """Liest die letzten 300 Zeilen der FFmpeg-Log-Datei."""
-    log_content = "Log-Datei (ffmpeg.log) nicht gefunden."
+    log_content = _("Log-Datei (ffmpeg.log) nicht gefunden.")
     try:
         with open('ffmpeg.log', 'r', encoding='utf-8', errors='replace') as f:
             # Nutze deque, um effizient nur die letzten 300 Zeilen zu lesen
@@ -492,7 +581,7 @@ def stop_streamer():
         with open(pid_file, 'r') as f:
             pid = int(f.read().strip())
     except (FileNotFoundError, ValueError):
-        flash("PID-Datei nicht gefunden. Der Streamer lief vermutlich bereits nicht mehr.", "warning")
+        flash(_("PID-Datei nicht gefunden. Der Streamer lief vermutlich bereits nicht mehr."), "warning")
         # Setze Status auf Offline, falls die Datei noch "Online" anzeigt
         with open(status_file, 'w', encoding='utf-8') as f: json.dump({"status": "Offline"}, f)
         return redirect(url_for('index'))
@@ -507,16 +596,16 @@ def stop_streamer():
         gone, alive = psutil.wait_procs([parent], timeout=3)
         
         if not alive:
-            flash("Streamer-Skript wurde erfolgreich gestoppt.", "success")
+            flash(_("Streamer-Skript wurde erfolgreich gestoppt."), "success")
         else:
             # Falls terminate() nicht reicht, erzwinge den Stopp
             for p in alive: p.kill()
-            flash("Streamer-Prozess reagierte nicht und wurde erzwungen beendet.", "warning")
+            flash(_("Streamer-Prozess reagierte nicht und wurde erzwungen beendet."), "warning")
 
     except psutil.NoSuchProcess:
-        flash("Prozess nicht gefunden, war bereits beendet.", "info")
+        flash(_("Prozess nicht gefunden, war bereits beendet."), "info")
     except Exception as e:
-        flash(f"Fehler beim Stoppen des Streamer-Skripts: {e}", "error")
+        flash(_("Fehler beim Stoppen des Streamer-Skripts: %(error)s", error=e), "error")
     finally:
         if os.path.exists(pid_file): os.remove(pid_file)
         # Schreibe in jedem Fall den "Offline"-Status nach dem Stoppen
@@ -531,7 +620,7 @@ def delete_files_from_library():
     """Löscht ausgewählte Videodateien und deren Thumbnails permanent von der Festplatte."""
     files_to_delete = request.form.getlist('selected_videos')
     if not files_to_delete:
-        flash("Keine Videos zum Löschen ausgewählt.", "warning")
+        flash(_("Keine Videos zum Löschen ausgewählt."), "warning")
         return redirect(url_for('index', active_tab='library'))
 
     # Wichtiger Sicherheitsschritt: Lade die erlaubten Verzeichnisse, um zu verhindern,
@@ -544,7 +633,7 @@ def delete_files_from_library():
         allowed_dirs = []
 
     if not allowed_dirs:
-        flash("Fehler: Keine Video-Verzeichnisse konfiguriert. Löschen nicht möglich.", "error")
+        flash(_("Fehler: Keine Video-Verzeichnisse konfiguriert. Löschen nicht möglich."), "error")
         return redirect(url_for('index', active_tab='library'))
 
     deleted_count = 0
@@ -577,9 +666,9 @@ def delete_files_from_library():
             error_count += 1
     
     if deleted_count > 0:
-        flash(f"{deleted_count} Video(s) wurden permanent gelöscht.", "success")
+        flash(_("%(count)s Video(s) wurden permanent gelöscht.", count=deleted_count), "success")
     if error_count > 0:
-        flash(f"{error_count} Video(s) konnten nicht gelöscht werden. Siehe Log für Details.", "error")
+        flash(_("%(count)s Video(s) konnten nicht gelöscht werden. Siehe Log für Details.", count=error_count), "error")
 
     return redirect(url_for('index', active_tab='library'))
 
@@ -614,7 +703,7 @@ def find_orphaned_videos():
                     if row: # Nur wenn die Zeile nicht leer ist
                         playlist_videos_set.add(os.path.normpath(row[0].strip()))
         except Exception as e:
-            flash(f"Fehler beim Lesen der Playlist '{os.path.basename(playlist_path)}': {e}", "warning")
+            flash(_("Fehler beim Lesen der Playlist '%(playlist)s': %(error)s", playlist=os.path.basename(playlist_path), error=e), "warning")
 
     # 3. Die Differenz finden (Videos, die auf der Platte, aber in keiner Playlist sind)
     orphaned_videos = sorted(list(disk_videos_set - playlist_videos_set))
@@ -622,7 +711,7 @@ def find_orphaned_videos():
     # 4. Das Ergebnis in der Session speichern, um es nach der Weiterleitung anzuzeigen
     session['orphaned_videos_result'] = orphaned_videos
 
-    flash(f"Analyse abgeschlossen. {len(orphaned_videos)} ungenutzte Video(s) gefunden.")
+    flash(_("Analyse abgeschlossen. %(count)s ungenutzte Video(s) gefunden.", count=len(orphaned_videos)))
     return redirect(url_for('index', active_tab='library'))
 
 # Ersetzen Sie die gesamte remove_from_playlist-Funktion mit dieser.
@@ -633,7 +722,7 @@ def remove_from_playlist():
     editing_playlist_id = request.form.get('editing_playlist_id')
 
     if entry_index_str is None or not editing_playlist_id:
-        flash("Fehlende Daten zum Entfernen des Eintrags.", "error")
+        flash(_("Fehlende Daten zum Entfernen des Eintrags."), "error")
         return redirect(url_for('index', active_tab='playlist'))
 
     try:
@@ -642,7 +731,7 @@ def remove_from_playlist():
         playlist_info = playlists_db.get(editing_playlist_id)
         
         if not playlist_info:
-            flash("Die zu bearbeitende Playlist wurde nicht gefunden.", "error")
+            flash(_("Die zu bearbeitende Playlist wurde nicht gefunden."), "error")
             return redirect(url_for('index', active_tab='playlist'))
 
         playlist_path = os.path.join('playlists', playlist_info['filename'])
@@ -661,12 +750,12 @@ def remove_from_playlist():
             writer = csv.writer(f)
             writer.writerows(rows)
 
-        flash("Video-Eintrag wurde aus der Playlist entfernt.", "success")
+        flash(_("Video-Eintrag wurde aus der Playlist entfernt."), "success")
 
     except (ValueError, TypeError):
-        flash("Ungültiger Index zum Entfernen des Eintrags.", "error")
+        flash(_("Ungültiger Index zum Entfernen des Eintrags."), "error")
     except Exception as e:
-        flash(f"Fehler beim Entfernen des Eintrags: {e}", "error")
+        flash(_("Fehler beim Entfernen des Eintrags: %(error)s", error=e), "error")
 
     return redirect(url_for('index', active_tab='playlist', edit_playlist=editing_playlist_id))
 
@@ -714,7 +803,7 @@ def save_rotation():
     playlist_ids_json = request.form.get('playlist_ids')
 
     if not rotation_name or not playlist_ids_json:
-        flash("Fehlende Daten zum Speichern der Rotation.", "error")
+        flash(_("Fehlende Daten zum Speichern der Rotation."), "error")
         return redirect(url_for('index', active_tab='rotations'))
 
     try:
@@ -751,7 +840,7 @@ def save_rotation():
             writer = csv.writer(f)
             for video_id in master_video_ids:
                 video_info = videos_db.get(video_id, {})
-                title, _ = os.path.splitext(video_info.get('basename', 'Unbekannt'))
+                title, _ = os.path.splitext(video_info.get('basename', _('Unbekannt')))
                 writer.writerow([video_id, title, 'Just Chatting', '1'])
 
         master_playlist_id = None
@@ -768,15 +857,13 @@ def save_rotation():
         with open('playlists.json', 'w', encoding='utf-8') as f:
             json.dump(playlists_db, f, indent=4)
 
-        flash(f"Rotation '{rotation_name}' gespeichert und als Playlist kompiliert.", "success")
+        flash(_("Rotation '%(rotation_name)s' gespeichert und als Playlist kompiliert.", rotation_name=rotation_name), "success")
 
     except Exception as e:
-        flash(f"Ein unerwarteter Fehler ist aufgetreten: {e}", "error")
+        flash(_("Ein unerwarteter Fehler ist aufgetreten: %(error)s", error=e), "error")
         return redirect(url_for('index', active_tab='rotations'))
 
     return redirect(url_for('index', active_tab='playlist'))
-    
-
 
 @app.route('/delete_rotation', methods=['POST'])
 def delete_rotation():
@@ -784,7 +871,7 @@ def delete_rotation():
     rotation_id_to_delete = request.form.get('rotation_id')
     
     if not rotation_id_to_delete:
-        flash("Keine Rotation zum Löschen ausgewählt.", "error")
+        flash(_("Keine Rotation zum Löschen ausgewählt."), "error")
         return redirect(url_for('index', active_tab='rotations'))
 
     try:
@@ -793,11 +880,11 @@ def delete_rotation():
             deleted_name = rotations_db.pop(rotation_id_to_delete)['name']
             with open('rotations.json', 'w', encoding='utf-8') as f:
                 json.dump(rotations_db, f, indent=4)
-            flash(f"Rotation '{deleted_name}' wurde gelöscht.", "success")
+            flash(_("Rotation '%(rotation_name)s' wurde gelöscht.", rotation_name=deleted_name), "success")
         else:
-            flash("Zu löschende Rotation nicht gefunden.", "warning")
+            flash(_("Zu löschende Rotation nicht gefunden."), "warning")
     except Exception as e:
-        flash(f"Fehler beim Löschen der Rotation: {e}", "error")
+        flash(_("Fehler beim Löschen der Rotation: %(error)s", error=e), "error")
 
     return redirect(url_for('index', active_tab='rotations'))
 
@@ -808,7 +895,7 @@ def duplicate_entry():
 
     # KORREKTUR: Wir prüfen explizit auf 'None', damit der Index 0 als gültig erkannt wird.
     if not editing_playlist_id or entry_index_str is None:
-        flash("Fehlende Informationen zum Duplizieren.", "error")
+        flash(_("Fehlende Informationen zum Duplizieren."), "error")
         return redirect(url_for('index', active_tab='playlist'))
 
     try:
@@ -816,7 +903,7 @@ def duplicate_entry():
         playlists_db = load_playlists_db()
         playlist_info = playlists_db.get(editing_playlist_id)
         if not playlist_info:
-            flash("Playlist nicht gefunden.", "error")
+            flash(_("Playlist nicht gefunden."), "error")
             return redirect(url_for('index', active_tab='playlist'))
 
         playlist_path = os.path.join('playlists', playlist_info['filename'])
@@ -833,17 +920,15 @@ def duplicate_entry():
             writer = csv.writer(f)
             writer.writerows(rows)
 
-        flash("Eintrag erfolgreich dupliziert.", "success")
+        flash(_("Eintrag erfolgreich dupliziert."), "success")
 
     except Exception as e:
-        flash(f"Fehler beim Duplizieren des Eintrags: {e}", "error")
+        flash(_("Fehler beim Duplizieren des Eintrags: %(error)s", error=e), "error")
 
     return redirect(url_for('index', active_tab='playlist', edit_playlist=editing_playlist_id))
 
 
-
 # --- Routes ---
-# ERSETZEN SIE DIE GESAMTE INDEX-FUNKTION HIERMIT
 
 @app.route('/')
 def index():
@@ -860,6 +945,7 @@ def index():
     except (FileNotFoundError, json.JSONDecodeError): manager_config = {}
     try:
         with open(CONFIG_JSON, 'r', encoding='utf-8') as f: streamer_config = json.load(f)
+        client_secret_exists = bool(streamer_config.get('twitch_api', {}).get('client_secret'))
     except (FileNotFoundError, json.JSONDecodeError): streamer_config = {}
     if 'twitch_api' not in streamer_config: streamer_config['twitch_api'] = {}
     if 'stream_settings' not in streamer_config: streamer_config['stream_settings'] = {}
@@ -975,24 +1061,44 @@ def index():
                            active_playlist_info=active_playlist_info, rotations_db=rotations_db,
                            rotation_to_edit=rotation_to_edit, rotation_name_to_edit=rotation_name_to_edit,
                            bot_commands=bot_commands, schedule=schedule_data,update_info=update_info,
-                           config_presets=config_presets)
+                           config_presets=config_presets,client_secret_exists=client_secret_exists)
     
 @app.route('/status')
 def get_status():
-    data = {"status": "Unknown", "bot_status": "Unknown"}
+    raw_data = {"status": "Unknown", "bot_status": "Unknown"}
     try:
         with open(STATUS_JSON, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+            raw_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        data = {"status": "Offline"}
+        raw_data = {"status": "Offline"}
 
-    data['bot_status'] = "Online" if is_bot_running() else "Offline"
-    return jsonify(data)
+    bot_status_raw = "Online" if is_bot_running() else "Offline"
+    raw_data['bot_status'] = bot_status_raw
+    
+    # Erstelle das übersetzte JSON, das an den Browser gesendet wird
+    translated_data = {
+        # Füge die rohen, englischen Werte für die JS-Logik hinzu
+        "status_raw": raw_data.get('status'),
+        "bot_status_raw": raw_data.get('bot_status'),
 
+        # Übersetze die Werte für die Anzeige
+        "status": _(raw_data.get('status')),
+        "bot_status": _(raw_data.get('bot_status')),
+        
+        # Behalte alle anderen Daten (now_playing, etc.) bei
+        "now_playing": raw_data.get('now_playing'),
+        "title": raw_data.get('title'),
+        "game": raw_data.get('game'),
+        "video_duration": raw_data.get('video_duration'),
+        "video_elapsed": raw_data.get('video_elapsed')
+    }
+
+    return jsonify(translated_data)
+    
 @app.route('/get_log_content')
 def get_log_content():
     """Liest den Inhalt der streamer.log-Datei und gibt ihn als JSON zurück."""
-    log_content = "Log-Datei (streamer.log) nicht gefunden."
+    log_content = _("Log-Datei (streamer.log) nicht gefunden.")
     try:
         with open('streamer.log', 'r', encoding='utf-8', errors='replace') as f:
             # Read only the last few lines to avoid performance issues with large logs
@@ -1005,10 +1111,10 @@ def get_log_content():
 @app.route('/start_bot', methods=['POST'])
 def start_bot():
     if is_bot_running():
-        flash("Der Bot-Prozess läuft bereits!", "warning")
+        flash(_("Der Bot-Prozess läuft bereits!"), "warning")
         return redirect(url_for('index', active_tab='bot'))
 
-    print("Starte Bot-Skript (twitch_bot.py)...")
+    print(_("Starte Bot-Skript (twitch_bot.py)..."))
     try:
         python_executable = sys.executable
         env = os.environ.copy()
@@ -1030,16 +1136,16 @@ def start_bot():
         with open('bot.pid', 'w') as f:
             f.write(str(process.pid))
             
-        flash("Bot-Skript wurde erfolgreich gestartet!", "success")
+        flash(_("Bot-Skript wurde erfolgreich gestartet!"), "success")
         time.sleep(2)
     except Exception as e:
-        flash(f"Fehler beim Starten des Bot-Skripts: {e}", "error")
+        flash(_("Fehler beim Starten des Bot-Skripts: %(error)s", error=e), "error")
         
     return redirect(url_for('index', active_tab='bot'))
 
 @app.route('/get_chat_log_content')
 def get_chat_log_content():
-    log_content = "Chat-Log (chat.log) nicht gefunden."
+    log_content = _("Chat-Log (chat.log) nicht gefunden.")
     try:
         with open('chat.log', 'r', encoding='utf-8', errors='replace') as f:
             last_lines = deque(f, maxlen=100) # Wir zeigen die letzten 100 Zeilen an
@@ -1052,7 +1158,7 @@ def get_chat_log_content():
 def stop_bot():
     pid_file = 'bot.pid'
     if not is_bot_running():
-        flash("Der Bot-Prozess lief bereits nicht mehr.", "warning")
+        flash(_("Der Bot-Prozess lief bereits nicht mehr."), "warning")
         if os.path.exists(pid_file): os.remove(pid_file)
         return redirect(url_for('index', active_tab='bot'))
 
@@ -1062,11 +1168,11 @@ def stop_bot():
         parent = psutil.Process(pid)
         parent.terminate()
         parent.wait(timeout=3)
-        flash("Bot-Skript wurde erfolgreich gestoppt.", "success")
+        flash(_("Bot-Skript wurde erfolgreich gestoppt."), "success")
     except psutil.NoSuchProcess:
-        flash("Prozess nicht gefunden, war bereits beendet.", "info")
+        flash(_("Prozess nicht gefunden, war bereits beendet."), "info")
     except Exception as e:
-        flash(f"Fehler beim Stoppen des Bot-Skripts: {e}", "error")
+        flash(_("Fehler beim Stoppen des Bot-Skripts: %(error)s", error=e), "error")
     finally:
         if os.path.exists(pid_file): os.remove(pid_file)
             
@@ -1074,7 +1180,7 @@ def stop_bot():
 
 @app.route('/get_bot_log_content')
 def get_bot_log_content():
-    log_content = "Log-Datei (bot.log) nicht gefunden."
+    log_content = _("Log-Datei (bot.log) nicht gefunden.")
     try:
         with open('bot.log', 'r', encoding='utf-8', errors='replace') as f:
             last_lines = deque(f, maxlen=300)
@@ -1092,8 +1198,10 @@ def get_thumbnail(video_id):
 
 @app.route('/import_new_videos', methods=['POST'])
 def import_new_videos():
-    if check_watch_folder(): flash("New videos were successfully imported!")
-    else: flash("No new videos found in the '_neu_' folder.")
+    if check_watch_folder():
+        flash(_("Neue Videos wurden erfolgreich importiert!"), "success")
+    else:
+        flash(_("Keine neuen Videos im '_neu_'-Ordner gefunden."), "info")
     return redirect(url_for('index', active_tab='playlist'))
 
 @app.route('/generate_thumbnails', methods=['POST'])
@@ -1120,7 +1228,7 @@ def generate_thumbnails():
                 pattern = os.path.join(video_dir, '**', f'*{ext}')
                 all_video_paths.extend(glob.glob(pattern, recursive=True))
         except OSError as e:
-            flash(f"Warnung: Video-Verzeichnis '{video_dir}' konnte nicht gelesen werden: {e}", "warning")
+            flash(_("Warnung: Video-Verzeichnis '%(dir)s' konnte nicht gelesen werden: %(error)s", dir=video_dir, error=e), "warning")
             continue
 
     # 3. Iteriere durch die gefundene Liste und generiere Thumbnails
@@ -1143,7 +1251,7 @@ def generate_thumbnails():
             except Exception as e:
                 print(f"Konnte Thumbnail für {video_path} nicht erstellen: {e}")
                 
-    flash(f"{generated_count} neue(s) Thumbnail(s) wurde(n) mit der Skalierung {scale} erstellt!")
+    flash(_("%(count)s neue(s) Thumbnail(s) wurde(n) mit der Skalierung %(scale)s erstellt!", count=generated_count, scale=scale), "success")
     return redirect(url_for('index', active_tab='playlist'))
 
 @app.route('/shuffle', methods=['POST'])
@@ -1167,9 +1275,9 @@ def shuffle_playlist():
                 # Stelle sicher, dass das Status-Feld existiert und schreibe die ID zurück
                 status = v.get('status', '1')
                 writer.writerow([v['id'], v['title'], v['game'], status])
-        flash("Playlist wurde erfolgreich gemischt!")
+        flash(_("Playlist wurde erfolgreich gemischt!"), "success")
     except Exception as e:
-        flash(f"Fehler beim Mischen der Playlist: {e}", "error")
+        flash(_("Fehler beim Mischen der Playlist: %(error)s", error=e), "error")
     return redirect(url_for('index', active_tab='playlist'))
 
 @app.route('/bulk_enable', methods=['POST'])
@@ -1195,9 +1303,9 @@ def bulk_enable():
         with open(active_playlist_path, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f)
             writer.writerows(playlist_data)
-        flash("Alle Videos wurden aktiviert!")
+        flash(_("Alle Videos wurden aktiviert!"), "success")
     except Exception as e:
-        flash(f"Fehler beim Aktivieren aller Videos: {e}")
+        flash(_("Fehler beim Aktivieren aller Videos: %(error)s", error=e), "error")
     return redirect(url_for('index', active_tab='playlist'))
 
 @app.route('/bulk_disable', methods=['POST'])
@@ -1223,9 +1331,9 @@ def bulk_disable():
         with open(active_playlist_path, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f)
             writer.writerows(playlist_data)
-        flash("Alle Videos wurden deaktiviert!")
+        flash(_("Alle Videos wurden deaktiviert!"), "success")
     except Exception as e:
-        flash(f"Fehler beim Deaktivieren aller Videos: {e}")
+        flash(_("Fehler beim Deaktivieren aller Videos: %(error)s", error=e), "error")
     return redirect(url_for('index', active_tab='playlist'))
 
 
@@ -1244,8 +1352,9 @@ def save_and_restart_deferred():
         session_data['restart_pending'] = True
         
         with open('session.json', 'w', encoding='utf-8') as f: json.dump(session_data, f, indent=2)
-        flash('Playlist gespeichert! Der Stream wird nach dem aktuellen Video neu gestartet.')
-    except Exception as e: flash(f'Fehler beim Speichern: {e}')
+        flash(_('Playlist gespeichert! Der Stream wird nach dem aktuellen Video neu gestartet.'), "info")
+    except Exception as e:
+        flash(_('Fehler beim Speichern: %(error)s', error=e), "error")
     return redirect(url_for('index', active_tab='playlist'))
 
 
@@ -1253,13 +1362,13 @@ def save_and_restart_deferred():
 def save_playlist_as():
     new_name = request.form.get('new_playlist_name')
     if not new_name:
-        flash("Bitte gib einen Namen für die neue Playlist an.")
+        flash(_("Bitte gib einen Namen für die neue Playlist an."), "error")
         return redirect(url_for('index', active_tab='playlist'))
     if not new_name.lower().endswith('.csv'): new_name += '.csv'
     new_name = "".join(c for c in new_name if c.isalnum() or c in (' ', '.', '_', '-')).rstrip()
     new_playlist_path = os.path.join('playlists', new_name)
     if os.path.exists(new_playlist_path):
-        flash(f"Eine Playlist mit dem Namen '{new_name}' existiert bereits.")
+        flash(_("Eine Playlist mit dem Namen '%(name)s' existiert bereits.", name=new_name), "error")
         return redirect(url_for('index', active_tab='playlist'))
     filenames = request.form.getlist('filename')
     titles = request.form.getlist('title')
@@ -1270,8 +1379,9 @@ def save_playlist_as():
             for i in range(len(filenames)):
                 status = '1' if f'status_{i}' in request.form else '0'
                 writer.writerow([filenames[i], titles[i], games[i], status])
-        flash(f"Playlist erfolgreich als '{new_name}' gespeichert!")
-    except Exception as e: flash(f"Fehler beim Speichern der neuen Playlist: {e}")
+        flash(_("Playlist erfolgreich als '%(name)s' gespeichert!", name=new_name), "success")
+    except Exception as e:
+        flash(_("Fehler beim Speichern der neuen Playlist: %(error)s", error=e), "error")
     return redirect(url_for('index', active_tab='playlist'))
 
 @app.route('/switch_playlist', methods=['POST'])
@@ -1288,7 +1398,7 @@ def switch_playlist():
             break
     
     if not target_playlist_id:
-        flash(f"Fehler: Playlist '{selected_filename}' konnte nicht gefunden werden.", "error")
+        flash(_("Fehler: Playlist '%(filename)s' konnte nicht gefunden werden.", filename=selected_filename), "error")
         return redirect(url_for('index', active_tab='playlist'))
 
     try:
@@ -1311,20 +1421,20 @@ def switch_playlist():
         session_data['active_playlist_id'] = target_playlist_id
         if restart_mode == 'soft':
             session_data['restart_pending'] = True
-            flash_message = f"'{selected_filename}' wird nach dem aktuellen Video aktiviert."
+            flash_message = _("'%s' wird nach dem aktuellen Video aktiviert.") % selected_filename
         elif restart_mode == 'hard':
             session_data['force_restart'] = True
-            flash_message = f"'{selected_filename}' wird jetzt aktiviert. Stream startet neu."
+            flash_message = _("'%s' wird jetzt aktiviert. Stream startet neu.") % selected_filename
         else: # Fallback, falls kein Modus übergeben wird
             session_data['force_restart'] = True
-            flash_message = f"'{selected_filename}' aktiviert."
+            flash_message = _("'%s' aktiviert.") % selected_filename
 
         with open('session.json', 'w', encoding='utf-8') as f:
             json.dump(session_data, f, indent=2)
 
         flash(flash_message, "success")
     except Exception as e:
-        flash(f"Fehler beim Aktivieren der Playlist: {e}", "error")
+        flash(_("Fehler beim Aktivieren der Playlist: %(error)s", error=e), "error")
 
     return redirect(url_for('index', active_tab='playlist'))
 
@@ -1348,7 +1458,7 @@ def delete_playlist():
     except (FileNotFoundError, json.JSONDecodeError): pass
 
     if config.get('active_playlist_id') == target_playlist_id:
-        flash(f"Fehler: Die aktive Playlist '{playlist_to_delete_filename}' kann nicht gelöscht werden.", "error")
+        flash(_("Fehler: Die aktive Playlist '%(filename)s' kann nicht gelöscht werden.", filename=playlist_to_delete_filename), "error")
         return redirect(url_for('index', active_tab='playlist'))
 
     # Löschvorgang
@@ -1362,13 +1472,12 @@ def delete_playlist():
             with open('playlists.json', 'w', encoding='utf-8') as f:
                 json.dump(playlists_db, f, indent=4) # Speichere die aktualisierte DB
             
-        flash(f"Playlist '{playlist_to_delete_filename}' wurde erfolgreich gelöscht.", "success")
+        flash(_("Playlist '%(filename)s' wurde erfolgreich gelöscht.", filename=playlist_to_delete_filename), "success")
     except Exception as e:
-        flash(f"Fehler beim Löschen der Playlist: {e}", "error")
+        flash(_("Fehler beim Löschen der Playlist: %(error)s", error=e), "error")
 
     return redirect(url_for('index', active_tab='playlist'))
 
-# ERSETZEN SIE DIESE GESAMTE FUNKTION
 
 # NEUE, ROBUSTERE VERSION
 @app.route('/save_metadata', methods=['POST'])
@@ -1381,12 +1490,12 @@ def save_metadata():
         playlist_data = data.get('playlist_data', [])
 
         if not editing_playlist_id:
-            return jsonify(success=False, error="Keine zu bearbeitende Playlist-ID übermittelt."), 400
+            return jsonify(success=False, error=_("Keine zu bearbeitende Playlist-ID übermittelt.")), 400
 
         playlists_db = load_playlists_db()
         playlist_to_save_info = playlists_db.get(editing_playlist_id)
         if not playlist_to_save_info:
-            return jsonify(success=False, error=f"Playlist mit ID '{editing_playlist_id}' nicht gefunden."), 404
+            return jsonify(success=False, error=_("Playlist mit ID '%(id)s' nicht gefunden.", id=editing_playlist_id)), 404
 
         playlist_path = os.path.join('playlists', playlist_to_save_info['filename'])
 
@@ -1405,11 +1514,12 @@ def save_metadata():
             writer = csv.writer(f)
             writer.writerows(updated_rows)
         
-        flash(f"Änderungen in Playlist '{playlist_to_save_info['name']}' erfolgreich gespeichert!", "success")
+        flash(_("Änderungen in Playlist '%(name)s' erfolgreich gespeichert!", name=playlist_to_save_info['name']), "success")
         return jsonify(success=True)
 
     except Exception as e:
-        return jsonify(success=False, error=str(e)), 500
+        # Gib eine generische, übersetzbare Fehlermeldung zurück anstatt des technischen Fehlers
+        return jsonify(success=False, error=_("Ein unerwarteter Fehler ist aufgetreten.")), 500
 
 @app.route('/save_playlist_and_restart', methods=['POST'])
 def save_playlist_and_restart():
@@ -1426,8 +1536,9 @@ def save_playlist_and_restart():
         session_data['force_restart'] = True
         
         with open('session.json', 'w', encoding='utf-8') as f: json.dump(session_data, f, indent=2)
-        flash('Playlist gespeichert! Neustart-Signal wurde gesendet.')
-    except Exception as e: flash(f'Fehler beim Speichern der Playlist: {e}')
+        flash(_('Playlist gespeichert! Neustart-Signal wurde gesendet.'), "info")
+    except Exception as e:
+        flash(_('Fehler beim Speichern der Playlist: %(error)s', error=e), "error")
     return redirect(url_for('index', active_tab='process'))
 
 @app.route('/save_manager_config', methods=['POST'])
@@ -1455,9 +1566,9 @@ def save_manager_config():
     try:
         with open(MANAGER_CONFIG_JSON, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=2)
-        flash('Manager configuration saved successfully!')
+        flash(_('Manager-Konfiguration erfolgreich gespeichert!'), "success")
     except Exception as e:
-        flash(f'Error saving manager config: {e}')
+        flash(_('Fehler beim Speichern der Manager-Konfiguration: %(error)s', error=e), "error")
     return redirect(url_for('index', active_tab='manager_config'))
 
 @app.route('/save_schedule', methods=['POST'])
@@ -1504,10 +1615,10 @@ def save_schedule():
         with open('schedule.json', 'w', encoding='utf-8') as f:
             json.dump(new_schedule, f, indent=4)
         
-        flash("Sendeplan erfolgreich gespeichert!", "success")
+        flash(_("Sendeplan erfolgreich gespeichert!"), "success")
 
     except Exception as e:
-        flash(f"Fehler beim Speichern des Sendeplans: {e}", "error")
+        flash(_("Fehler beim Speichern des Sendeplans: %(error)s", error=e), "error")
 
     return redirect(url_for('index', active_tab='schedule'))
 
@@ -1516,12 +1627,12 @@ def save_schedule():
 @app.route('/upload_font', methods=['POST'])
 def upload_font():
     if 'font_file' not in request.files:
-        flash('Keine Datei im Request gefunden.', 'error')
+        flash(_('Keine Datei im Request gefunden.'), 'error')
         return redirect(url_for('index', active_tab='settings'))
         
     file = request.files['font_file']
     if file.filename == '':
-        flash('Keine Datei ausgewählt.', 'warning')
+        flash(_('Keine Datei ausgewählt.'), 'warning')
         return redirect(url_for('index', active_tab='settings'))
 
     if file and file.filename.lower().endswith(VALID_FONT_EXTENSIONS):
@@ -1530,12 +1641,12 @@ def upload_font():
         upload_path = os.path.join(FONTS_DIR, filename)
         
         if os.path.exists(upload_path):
-            flash(f"Eine Schriftart mit dem Namen '{filename}' existiert bereits.", "warning")
+            flash(_("Eine Schriftart mit dem Namen '%(filename)s' existiert bereits.", filename=filename), "warning")
         else:
             file.save(upload_path)
-            flash(f"Schriftart '{filename}' erfolgreich hochgeladen!", "success")
+            flash(_("Schriftart '%(filename)s' erfolgreich hochgeladen!", filename=filename), "success")
     else:
-        flash('Ungültiger Dateityp. Nur .ttf und .otf sind erlaubt.', 'error')
+        flash(_('Ungültiger Dateityp. Nur .ttf und .otf sind erlaubt.'), 'error')
         
     return redirect(url_for('index', active_tab='settings'))
 
@@ -1543,13 +1654,13 @@ def upload_font():
 def delete_font():
     font_name = request.form.get('font_name_to_delete')
     if not font_name:
-        flash('Kein Schriftart-Name übergeben.', 'error')
+        flash(_('Kein Schriftart-Name übergeben.'), 'error')
         return redirect(url_for('index', active_tab='settings'))
     
     # Sicherheitsprüfung: Stelle sicher, dass der Dateiname keine Pfade enthält
     secure_name = secure_filename(font_name)
     if secure_name != font_name:
-        flash('Ungültiger Schriftart-Name.', 'error')
+        flash(_('Ungültiger Schriftart-Name.'), 'error')
         return redirect(url_for('index', active_tab='settings'))
         
     font_path = os.path.join(FONTS_DIR, secure_name)
@@ -1557,11 +1668,11 @@ def delete_font():
     try:
         if os.path.exists(font_path):
             os.remove(font_path)
-            flash(f"Schriftart '{secure_name}' wurde gelöscht.", "success")
+            flash(_("Schriftart '%(name)s' wurde gelöscht.", name=secure_name), "success")
         else:
-            flash('Zu löschende Schriftart nicht gefunden.', 'warning')
+            flash(_('Zu löschende Schriftart nicht gefunden.'), 'warning')
     except Exception as e:
-        flash(f"Fehler beim Löschen der Schriftart: {e}", "error")
+        flash(_("Fehler beim Löschen der Schriftart: %(error)s", error=e), "error")
 
     return redirect(url_for('index', active_tab='settings'))
 
@@ -1580,8 +1691,9 @@ def save_settings_js():
             "client_id": form_data.get('twitch_client_id'),
             "channel_name": form_data.get('twitch_channel_name')
         })
-        if form_data.get('twitch_oauth_token'):
-            config['twitch_api']['oauth_token'] = form_data.get('twitch_oauth_token')
+        # Speichere das Secret nur, wenn ein neues eingegeben wurde
+        if form_data.get('twitch_client_secret'):
+            config['twitch_api']['client_secret'] = form_data.get('twitch_client_secret')
         
         config['stream_settings'].update({
             "rtmp_url": form_data.get('rtmp_url')
@@ -1630,7 +1742,8 @@ def save_settings_js():
         
         return jsonify(success=True)
     except Exception as e:
-        return jsonify(success=False, error=str(e)), 500
+        # Ersetze die technische Fehlermeldung durch eine benutzerfreundliche, übersetzbare
+        return jsonify(success=False, error=_("Ein unerwarteter Fehler beim Speichern ist aufgetreten.")), 500
 
 
 @app.route('/save_config_preset', methods=['POST'])
@@ -1638,7 +1751,7 @@ def save_config_preset():
     try:
         preset_name = request.form.get('preset_name')
         if not preset_name or not preset_name.strip():
-            return jsonify(success=False, error="Preset-Name darf nicht leer sein."), 400
+            return jsonify(success=False, error=_("Preset-Name darf nicht leer sein.")), 400
 
         # Wir lesen die aktuelle config.json von der Festplatte, die korrekt sein sollte
         with open(CONFIG_JSON, 'r', encoding='utf-8') as f:
@@ -1656,7 +1769,7 @@ def save_config_preset():
         
         return jsonify(success=True)
     except Exception as e:
-        return jsonify(success=False, error=str(e)), 500
+        return jsonify(success=False, error=_("Fehler beim Speichern des Presets.")), 500
 
 
 @app.route('/load_config_preset', methods=['POST'])
@@ -1665,7 +1778,7 @@ def load_config_preset():
     try:
         preset_name = request.form.get('preset_to_load')
         if not preset_name:
-            return jsonify(success=False, error="Kein Preset zum Laden ausgewählt."), 400
+            return jsonify(success=False, error=_("Kein Preset zum Laden ausgewählt.")), 400
 
         with open('config_presets.json', 'r', encoding='utf-8') as f:
             presets = json.load(f)
@@ -1677,9 +1790,9 @@ def load_config_preset():
                 json.dump(config_to_load, f, indent=2)
             return jsonify(success=True)
         else:
-            return jsonify(success=False, error=f"Preset '{preset_name}' nicht gefunden."), 404
+            return jsonify(success=False, error=_("Preset '%(name)s' nicht gefunden.", name=preset_name)), 404
     except Exception as e:
-        return jsonify(success=False, error=str(e)), 500
+        return jsonify(success=False, error=_("Fehler beim Laden des Presets.")), 500
 
 @app.route('/delete_config_preset', methods=['POST'])
 def delete_config_preset():
@@ -1687,14 +1800,14 @@ def delete_config_preset():
     try:
         preset_name = request.form.get('preset_to_delete')
         if not preset_name:
-            return jsonify(success=False, error="Kein Preset zum Löschen ausgewählt."), 400
+            return jsonify(success=False, error=_("Kein Preset zum Löschen ausgewählt.")), 400
 
         presets = {}
         try:
             with open('config_presets.json', 'r', encoding='utf-8') as f:
                 presets = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
-            return jsonify(success=False, error="Preset-Datei nicht gefunden."), 404
+            return jsonify(success=False, error=_("Preset-Datei nicht gefunden.")), 404
 
         if preset_name in presets:
             del presets[preset_name]
@@ -1702,10 +1815,10 @@ def delete_config_preset():
                 json.dump(presets, f, indent=2)
             return jsonify(success=True)
         else:
-            return jsonify(success=False, error=f"Preset '{preset_name}' nicht gefunden."), 404
+            return jsonify(success=False, error=_("Preset '%(name)s' nicht gefunden.", name=preset_name)), 404
             
     except Exception as e:
-        return jsonify(success=False, error=str(e)), 500
+        return jsonify(success=False, error=_("Fehler beim Löschen des Presets.")), 500
    
 @app.route('/api/now_playing')
 def api_now_playing():
@@ -1737,14 +1850,15 @@ def api_now_playing():
     response_data['stream_status'] = 'ONLINE'
 
     # --- 2. Aktueller Titel & Fortschritt ---
+    na_string = _("N/A") # Übersetzbarer Fallback-Wert
     current_video_path = status.get('now_playing', '')
     duration = status.get('video_duration', 0)
     elapsed = status.get('video_elapsed', 0)
     progress_percent = int((elapsed / duration) * 100) if duration > 0 else 0
 
     response_data['now_playing'] = {
-        "title": status.get('title', 'N/A'),
-        "game": status.get('game', 'N/A'),
+        "title": status.get('title', na_string),
+        "game": status.get('game', na_string),
         "duration_seconds": duration,
         "elapsed_seconds": elapsed,
         "progress_percent": progress_percent
@@ -1775,14 +1889,13 @@ def api_now_playing():
                 total_tracks = len(rows)
                 if total_tracks > 0:
                     response_data['playlist'] = {
-                        "name": active_playlist_info.get('name', 'N/A'),
+                        "name": active_playlist_info.get('name', na_string),
                         "current_track_number": (next_index - 1 + total_tracks) % total_tracks + 1,
                         "total_tracks": total_tracks
                     }
 
                     for i in range(5):
                         idx = (next_index + i) % total_tracks
-                        # KORREKTUR: Prüfen, ob die Zeile existiert und genug Spalten hat
                         if idx < len(rows) and len(rows[idx]) >= 3:
                             response_data['next_up'].append({
                                 "title": rows[idx][1],
@@ -1818,7 +1931,7 @@ def api_now_playing():
             playlist_info = playlists_db.get(found_event['playlist'])
             if playlist_info:
                 response_data['scheduled_event'] = {
-                    "title": playlist_info.get('name', 'Scheduled Event'),
+                    "title": playlist_info.get('name', _('Geplantes Event')),
                     "start_time": found_event.get('start_time'),
                     "time_until_seconds": int(time_until.total_seconds()),
                     "time_until_human": str(timedelta(seconds=int(time_until.total_seconds())))
@@ -1834,7 +1947,7 @@ def add_bot_command():
     try:
         command_name = request.form.get('command_name').lower()
         if not command_name.startswith('!'):
-            flash("Fehler: Ein Befehl muss mit '!' beginnen.", "error")
+            flash(_("Fehler: Ein Befehl muss mit '!' beginnen."), "error")
             return redirect(url_for('index', active_tab='bot'))
 
         # Baue das neue, flexible "action"-Objekt
@@ -1864,9 +1977,9 @@ def add_bot_command():
         with open('commands.json', 'w', encoding='utf-8') as f:
             json.dump(commands, f, indent=2)
 
-        flash(f"Befehl '{command_name}' erfolgreich hinzugefügt!", "success")
+        flash(_("Befehl '%(name)s' erfolgreich hinzugefügt!", name=command_name), "success")
     except Exception as e:
-        flash(f"Fehler beim Hinzufügen des Befehls: {e}", "error")
+        flash(_("Fehler beim Hinzufügen des Befehls: %(error)s", error=e), "error")
 
     return redirect(url_for('index', active_tab='bot'))
 
@@ -1882,31 +1995,33 @@ def delete_bot_command():
             with open('commands.json', 'r', encoding='utf-8') as f:
                 commands = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
-            flash("Befehlsdatei nicht gefunden.", "error")
+            flash(_("Befehlsdatei nicht gefunden."), "error")
             return redirect(url_for('index', active_tab='bot'))
 
         if command_name in commands:
             del commands[command_name]
             with open('commands.json', 'w', encoding='utf-8') as f:
                 json.dump(commands, f, indent=2)
-            flash(f"Befehl '{command_name}' erfolgreich gelöscht!", "success")
+            flash(_("Befehl '%(name)s' erfolgreich gelöscht!", name=command_name), "success")
         else:
-            flash("Zu löschender Befehl nicht gefunden.", "warning")
+            flash(_("Zu löschender Befehl nicht gefunden."), "warning")
 
     except Exception as e:
-        flash(f"Fehler beim Löschen des Befehls: {e}", "error")
+        flash(_("Fehler beim Löschen des Befehls: %(error)s", error=e), "error")
 
     return redirect(url_for('index', active_tab='bot'))  
    
 if __name__ == '__main__':
-    # Lade die Manager-Konfiguration, um den Port zu bestimmen
     try:
         with open(MANAGER_CONFIG_JSON, 'r', encoding='utf-8') as f:
             manager_cfg = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        manager_cfg = {}
+        # Wenn die Datei nicht existiert, setze Standardwerte
+        manager_cfg = {'port': 5000}
     
+    # Lese den Port aus der Konfig, mit 5000 als absolut letztem Fallback
     port = manager_cfg.get('port', 5000)
     
-    print(f"Playlist Manager started! Open http://127.0.0.1:{port} in your browser.")
-    app.run(host='127.0.0.1', port=port, debug=True)
+    print(f"Playlist Manager started! Open https://127.0.0.1:{port} in your browser.")
+    # Füge ssl_context='adhoc' hinzu, um HTTPS zu aktivieren
+    app.run(host='127.0.0.1', port=port, debug=True, ssl_context='adhoc')

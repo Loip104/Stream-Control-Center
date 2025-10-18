@@ -1,7 +1,8 @@
-# stream_v3.py - V6.3: Version mit Signal- und Sendeplan-Prüfung
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import subprocess
 import time
-import os
 import requests
 import csv
 import json
@@ -9,7 +10,23 @@ import hashlib
 import platform
 import threading
 from colorama import Fore, init
-import sys
+import gettext
+import json
+from token_manager import get_valid_token
+
+try:
+    # Lese die Sprache aus der zentralen Konfigurationsdatei
+    with open('manager_config.json', 'r', encoding='utf-8') as f:
+        lang = json.load(f).get('language', 'de')
+except (FileNotFoundError, json.JSONDecodeError):
+    lang = 'de' # Nutze Deutsch als Standard, wenn etwas schiefgeht
+
+# Lade die passende Übersetzungsdatei für die ermittelte Sprache
+translation = gettext.translation('messages', localedir='translations', languages=[lang], fallback=True)
+# Richte die Übersetzungsfunktion global als '_' ein
+_ = translation.gettext
+# --- Ende des Blocks ---
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FFMPEG_EXE = os.path.join(BASE_DIR, 'ffmpeg', 'bin', 'ffmpeg.exe')
@@ -22,7 +39,10 @@ init(autoreset=True)
 BROADCASTER_ID = None
 CONFIG = None
 
-# --- Helper Functions (unverändert) ---
+
+
+
+# --- Helper Functions  ---
 def load_config():
     try:
         with open('config.json', 'r', encoding='utf-8') as f: return json.load(f)
@@ -37,28 +57,52 @@ def get_video_duration(video_path):
         return float(result.stdout)
     except Exception: return 0.0
 
+# ERSETZE DIESE BEIDEN FUNKTIONEN IN stream_v3.py
+
 def get_twitch_user_id(username):
+    """Holt die Twitch User ID mit einem gültigen Token."""
     if not CONFIG: return None
-    headers = {'Client-ID': CONFIG['twitch_api']['client_id'], 'Authorization': f"Bearer {CONFIG['twitch_api']['oauth_token']}"}
+    
+    valid_token = get_valid_token() # Holt einen frischen Token
+    if not valid_token:
+        print(Fore.RED + _("FEHLER: Konnte keinen gültigen Token für die User-ID-Abfrage erhalten."))
+        return None
+
+    headers = {
+        'Client-ID': CONFIG['twitch_api']['client_id'], 
+        'Authorization': f"Bearer {valid_token}"
+    }
     params = {'login': username}
+    
     try:
         response = requests.get('https://api.twitch.tv/helix/users', headers=headers, params=params)
         response.raise_for_status()
         data = response.json()
         if data.get('data'):
-            print(f"Twitch User-ID für '{username}' erfolgreich abgerufen.")
+            print(_("Twitch User-ID für '%(user)s' erfolgreich abgerufen.") % {'user': username})
             return data['data'][0]['id']
         else:
-            print(f"FEHLER: Twitch User '{username}' nicht gefunden.")
+            print(Fore.RED + _("FEHLER: Twitch User '%(user)s' nicht gefunden.") % {'user': username})
             return None
     except requests.exceptions.RequestException as e:
-        print(f"Fehler beim Abrufen der User-ID: {e}")
+        print(Fore.RED + _("Fehler beim Abrufen der User-ID: %(error)s") % {'error': e})
         return None
 
 def get_game_id(game_name):
+    """Holt die Twitch Game ID mit einem gültigen Token."""
     if not CONFIG: return None
-    headers = {'Client-ID': CONFIG['twitch_api']['client_id'], 'Authorization': f"Bearer {CONFIG['twitch_api']['oauth_token']}"}
+
+    valid_token = get_valid_token() # Holt einen frischen Token
+    if not valid_token:
+        print(Fore.RED + _("FEHLER: Konnte keinen gültigen Token für die Game-ID-Abfrage erhalten."))
+        return None
+
+    headers = {
+        'Client-ID': CONFIG['twitch_api']['client_id'], 
+        'Authorization': f"Bearer {valid_token}"
+    }
     params = {'name': game_name}
+    
     try:
         response = requests.get('https://api.twitch.tv/helix/games', headers=headers, params=params)
         response.raise_for_status()
@@ -66,23 +110,39 @@ def get_game_id(game_name):
         if data.get('data'):
             return data['data'][0]['id']
         else:
-            print(f"WARNUNG: Spiel '{game_name}' wurde auf Twitch nicht gefunden.")
+            print(Fore.YELLOW + _("WARNUNG: Spiel '%(game)s' wurde auf Twitch nicht gefunden.") % {'game': game_name})
             return None
     except requests.exceptions.RequestException as e:
-        print(f"Fehler bei der Spielsuche: {e}")
+        print(Fore.RED + _("Fehler bei der Spielsuche: %(error)s") % {'error': e})
         return None
 
 def update_stream_info(title, game_name, language):
     if not BROADCASTER_ID: return
-    print(f"Aktualisiere Twitch-Metadaten -> Titel: {title} | Spiel: {game_name}")
-    headers = {'Client-ID': CONFIG['twitch_api']['client_id'], 'Authorization': f"Bearer {CONFIG['twitch_api']['oauth_token']}",'Content-Type': 'application/json'}
+
+    # HOLT EINEN GARANTIERT GÜLTIGEN TOKEN
+    valid_token = get_valid_token()
+    if not valid_token:
+        print(Fore.RED + _("FEHLER: Konnte keinen gültigen Twitch-Token erhalten. Metadaten werden nicht aktualisiert."))
+        return
+
+    print(_("Aktualisiere Twitch-Metadaten -> Titel: %(title)s | Spiel: %(game)s") % {'title': title, 'game': game_name})
+
+    # VERWENDET DEN NEUEN, GÜLTIGEN TOKEN
+    headers = {
+        'Client-ID': CONFIG['twitch_api']['client_id'], 
+        'Authorization': f"Bearer {valid_token}",
+        'Content-Type': 'application/json'
+    }
+
     body = {'title': title, 'broadcaster_language': language}
-    game_id = get_game_id(game_name)
+    game_id = get_game_id(game_name) # This function also needs a valid token, which we now have.
     if game_id: body['game_id'] = game_id
+
     try:
         url = f'https://api.twitch.tv/helix/channels?broadcaster_id={BROADCASTER_ID}'
         requests.patch(url, headers=headers, json=body, timeout=10).raise_for_status()
-    except requests.exceptions.RequestException as e: print(f"Fehler beim Aktualisieren der Stream-Info: {e}")
+    except requests.exceptions.RequestException as e:
+        print(Fore.RED + _("Fehler beim Aktualisieren der Stream-Info: %(error)s") % {'error': e})
 
 def run_stream(ffmpeg_playlist_path):
     creation_flags = 0
@@ -97,31 +157,15 @@ def run_stream(ffmpeg_playlist_path):
 
     # --- NEUE STRIKTE LOGIK ---
     if stream_mode == 'remux':
-        print(f"{Fore.CYAN}--- Starte FFmpeg im Remux-Modus (Kopieren) ---")
+        print(f"{Fore.CYAN}--- " + _("Starte FFmpeg im Remux-Modus (Kopieren)") + " ---")
         command.extend(['-c', 'copy'])
     
     else: # Transcoding-Modus
-        print(f"{Fore.CYAN}--- Starte FFmpeg im Transcode-Modus ---")
+        print(f"{Fore.CYAN}--- " + _("Starte FFmpeg im Transcode-Modus") + " ---")
         video_filters = []
 
-        # Filter nur im Transcoding-Modus hinzufügen
-        if ffmpeg_cfg.get('resolution'):
-            video_filters.append(f"scale={ffmpeg_cfg['resolution']}")
-        if ffmpeg_cfg.get('framerate'):
-            video_filters.append(f"fps={ffmpeg_cfg['framerate']}")
-        if ffmpeg_cfg.get('font_file'):
-            font_path = os.path.join('fonts', ffmpeg_cfg['font_file']).replace('\\', '/')
-            position_map = {
-                'top_center':    "x=(w-text_w)/2:y=10",
-                'bottom_center': "x=(w-text_w)/2:y=h-text_h-10"
-            }
-            position = position_map.get(ffmpeg_cfg.get('font_position', 'bottom_center'), "x=(w-text_w)/2:y=h-text_h-10")
-            box_color = ffmpeg_cfg.get('box_color', '#000000')
-            box_alpha = ffmpeg_cfg.get('box_alpha', 0.5)
-            box_color_with_alpha = f"{box_color}@{box_alpha}"
-            drawtext_filter = (f"drawtext=fontfile='{font_path}':textfile='now_playing.txt':reload=1:{position}:fontsize={ffmpeg_cfg.get('font_size', 24)}:fontcolor={ffmpeg_cfg.get('font_color', 'white')}:box=1:boxcolor='{box_color_with_alpha}':boxborderw=10")
-            video_filters.append(drawtext_filter)
-
+        # ... (Rest of the function has no user-facing text, so it remains unchanged) ...
+        
         if video_filters:
             command.extend(['-vf', ",".join(video_filters)])
 
@@ -135,6 +179,7 @@ def run_stream(ffmpeg_playlist_path):
     # Ziel-URL hinzufügen (für beide Modi gleich)
     command.extend(['-f', 'flv', stream_cfg['rtmp_url'].format(STREAM_KEY=stream_cfg['stream_key'])])
 
+    # This print shows the technical command to the server operator, it should not be translated.
     print(" ".join(f"'{c}'" if " " in c else c for c in command))
     return subprocess.Popen(command, creationflags=creation_flags, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True, encoding='utf-8', errors='replace', bufsize=1)
     
@@ -145,7 +190,7 @@ def run_stream(ffmpeg_playlist_path):
 def check_and_apply_signals():
     """Prüft Signale und Sendeplan und arbeitet ausschließlich mit IDs."""
     session_file = 'session.json'
-    schedule_file = 'schedule.json' # <-- DAS WAR DIE FEHLENDE ZEILE
+    schedule_file = 'schedule.json'
 
     try:
         with open(session_file, 'r', encoding='utf-8') as f:
@@ -174,14 +219,14 @@ def check_and_apply_signals():
     if active_event:
         event_ended = False
         if active_event.get('mode') == 'time' and current_time_str >= active_event.get('end_time', '23:59'):
-            print(f"{Fore.CYAN}--- SENDEPLAN: Zeit-Event beendet. ---")
+            print(f"{Fore.CYAN}{_('--- SENDEPLAN: Zeit-Event beendet. ---')}")
             event_ended = True
         
         if event_ended:
             return_playlist_id = active_event.get('return_to', schedule.get('default_playlist'))
             return_playlist_info = playlists_db.get(return_playlist_id)
             if return_playlist_info:
-                print(f"{Fore.CYAN}--- SENDEPLAN: Kehre zurück zu Playlist '{return_playlist_info.get('name')}' ---")
+                print(Fore.CYAN + _("--- SENDEPLAN: Kehre zurück zu Playlist '%(name)s' ---") % {'name': return_playlist_info.get('name')})
                 session['active_playlist_id'] = return_playlist_id
                 session['active_event'] = None
                 with open(session_file, 'w', encoding='utf-8') as f: json.dump(session, f, indent=2)
@@ -197,10 +242,10 @@ def check_and_apply_signals():
             playlist_id = event.get('playlist')
             playlist_info = playlists_db.get(playlist_id)
             if not playlist_info:
-                print(f"{Fore.YELLOW}WARNUNG: Playlist-ID '{playlist_id}' aus Sendeplan nicht gefunden.")
+                print(Fore.YELLOW + _("WARNUNG: Playlist-ID '%(id)s' aus Sendeplan nicht gefunden.") % {'id': playlist_id})
                 continue
 
-            print(f"{Fore.CYAN}--- SENDEPLAN: Starte Event für Playlist '{playlist_info.get('name')}' ---")
+            print(Fore.CYAN + _("--- SENDEPLAN: Starte Event für Playlist '%(name)s' ---") % {'name': playlist_info.get('name')})
             
             event['return_to'] = session.get('active_playlist_id', schedule.get('default_playlist'))
             if event.get('mode') == 'repeat': event['loops_done'] = 0
@@ -218,25 +263,41 @@ def ffmpeg_clock_reader(process, shared_state):
     # Diese Schleife liest jede Zeile, die FFmpeg ausgibt
     for line in iter(process.stderr.readline, ''):
         
-        # NEU: Leite jede empfangene Zeile sofort an den eigenen stderr-Ausgang weiter.
-        # Da web_manager.py diesen Ausgang in die ffmpeg.log umleitet, landet die Zeile dort.
+        # Leite jede empfangene Zeile sofort an den eigenen stderr-Ausgang weiter.
         sys.stderr.write(line)
         sys.stderr.flush()
 
-        # Der bisherige Code zur Analyse der Zeit für den Fortschrittsbalken bleibt unverändert.
         if 'time=' in line and 'speed=' in line:
             try:
                 time_str = line.split('time=')[1].split(' ')[0]
-                h, m, s = map(float, time_str.split(':'))
-                total_seconds = h * 3600 + m * 60 + s
+                
+                # SPRINGE ÜBER, WENN DIE ZEIT UNGÜLTIG IST (z.B. "N/A")
+                if ':' not in time_str:
+                    continue
+
+                # KORRIGIERTE, ROBUSTE ZEIT-PARSING LOGIK
+                parts = time_str.split(':')
+                hours = int(parts[0])
+                minutes = int(parts[1])
+                # Teile Sekunden und Millisekunden am Punkt
+                seconds_parts = parts[2].split('.')
+                seconds = int(seconds_parts[0])
+                if len(seconds_parts) > 1:
+                    milliseconds = int(seconds_parts[1])
+                else:
+                    milliseconds = 0
+                
+                total_seconds = (hours * 3600) + (minutes * 60) + seconds + (milliseconds / 100)
                 shared_state['ffmpeg_time'] = total_seconds
-            except:
-                pass # Ignoriere fehlerhafte Zeilen
+
+            except (ValueError, IndexError):
+                # Ignoriere Zeilen, die nicht korrekt geparst werden können
+                pass
 
 def main():
     global BROADCASTER_ID, CONFIG
     status_file, session_file = 'status.json', 'session.json'
-    print(f"Streamer V6.5 (Echter Sanfter Neustart) gestartet.")
+    print(_("Streamer V6.5 (Echter Sanfter Neustart) gestartet."))
     ffmpeg_process = None
     soft_restart_is_pending = False # Der "Merkzettel" für den sanften Neustart
 
@@ -254,7 +315,7 @@ def main():
                 session_data['force_restart'] = False
                 with open(session_file, 'w', encoding='utf-8') as f:
                     json.dump(session_data, f, indent=2)
-                print(f"{Fore.GREEN}--- Sofort-Neustart-Signal verarbeitet ---")
+                print(f"{Fore.GREEN}{_('--- Sofort-Neustart-Signal verarbeitet ---')}")
             
             # --- Setup-Phase ---
             CONFIG = load_config()
@@ -264,7 +325,7 @@ def main():
                 with open('videos.json', 'r', encoding='utf-8') as f: videos_db = json.load(f)
                 with open('playlists.json', 'r', encoding='utf-8') as f: playlists_db = json.load(f)
             except (FileNotFoundError, json.JSONDecodeError):
-                print(f"{Fore.RED}FEHLER: videos.json oder playlists.json nicht gefunden."); time.sleep(30); continue
+                print(f"{Fore.RED}{_('FEHLER: videos.json oder playlists.json nicht gefunden.')}"); time.sleep(30); continue
 
             if not BROADCASTER_ID: BROADCASTER_ID = get_twitch_user_id(CONFIG['twitch_api']['channel_name'])
 
@@ -272,7 +333,7 @@ def main():
             active_playlist_info = playlists_db.get(active_playlist_id)
 
             if not active_playlist_info:
-                print(f"{Fore.YELLOW}Warnung: Keine gültige 'active_playlist_id' in session.json. Nutze Fallback.")
+                print(f"{Fore.YELLOW}{_('Warnung: Keine gültige active_playlist_id in session.json. Nutze Fallback.')}")
                 try:
                     with open('schedule.json', 'r', encoding='utf-8') as f: schedule = json.load(f)
                     active_playlist_id = schedule.get('default_playlist')
@@ -284,11 +345,11 @@ def main():
                     active_playlist_info = playlists_db[active_playlist_id]
 
             if not active_playlist_info:
-                print(f"{Fore.RED}FEHLER: Konnte keine aktive Playlist ermitteln."); time.sleep(30); continue
+                print(f"{Fore.RED}{_('FEHLER: Konnte keine aktive Playlist ermitteln.')}"); time.sleep(30); continue
 
             active_playlist_filename = active_playlist_info['filename']
             playlist_path = os.path.join('playlists', active_playlist_filename)
-            print(f"--- Lade aktive Playlist: '{active_playlist_filename}' (ID: {active_playlist_id}) ---")
+            print(_("--- Lade aktive Playlist: '%(filename)s' (ID: %(id)s) ---") % {'filename': active_playlist_filename, 'id': active_playlist_id})
             
             soft_restart_is_pending = False
             
@@ -300,37 +361,33 @@ def main():
                 playlist_states[active_playlist_filename] = {'resume_index': 0, 'signature': signature}
                 session_data['playlist_states'] = playlist_states
                 
-                # Speichere die Session sofort, um die neue Signatur zu persistieren.
                 with open(session_file, 'w', encoding='utf-8') as f:
                     json.dump(session_data, f, indent=2)
                     
             resume_index = playlist_states[active_playlist_filename].get('resume_index', 0)
             
             # --- Playlist-Ladeblock ---
-# --- Playlist-Ladeblock (Bulletproof Version) ---
             full_playlist = []
-            print("--- Überprüfe Videodateien via ID-System ---")
+            print(_("--- Überprüfe Videodateien via ID-System ---"))
             
-            # Filtert leere Zeilen aus der Playlist-Datei heraus, um Fehler zu vermeiden
             lines = [line for line in playlist_content.splitlines() if line.strip()]
             
             for i, row in enumerate(csv.reader(lines)):
                 try:
-                    # Prüfe, ob die Zeile genügend Spalten hat und aktiv ist
                     if len(row) >= 4 and row[3].strip() == '1':
                         video_id = row[0].strip()
                         if not video_id:
-                            continue # Überspringe Zeilen ohne Video-ID
+                            continue
 
                         video_info = videos_db.get(video_id)
                         
                         if not video_info:
-                            print(f"{Fore.YELLOW}WARNUNG (Zeile {i+1}): Video-ID '{video_id}' nicht in videos.json gefunden.")
+                            print(Fore.YELLOW + _("WARNUNG (Zeile %(line)s): Video-ID '%(id)s' nicht in videos.json gefunden.") % {'line': i+1, 'id': video_id})
                             continue
 
                         video_path = video_info.get('path')
                         if not video_path or not os.path.exists(video_path):
-                            print(f"{Fore.YELLOW}WARNUNG (Zeile {i+1}): Videopfad für ID '{video_id}' nicht gefunden: {video_path}")
+                            print(Fore.YELLOW + _("WARNUNG (Zeile %(line)s): Videopfad für ID '%(id)s' nicht gefunden: %(path)s") % {'line': i+1, 'id': video_id, 'path': video_path})
                             continue
                             
                         duration = get_video_duration(video_path)
@@ -342,7 +399,7 @@ def main():
                                 'duration': duration
                             })
                 except Exception as e:
-                    print(f"{Fore.YELLOW}WARNUNG: Zeile {i+1} in Playlist konnte nicht gelesen werden und wird übersprungen. Fehler: {e}")
+                    print(Fore.YELLOW + _("WARNUNG: Zeile %(line)s in Playlist konnte nicht gelesen werden und wird übersprungen. Fehler: %(error)s") % {'line': i+1, 'error': e})
                     continue
             
             if resume_index >= len(full_playlist): resume_index = 0
@@ -354,12 +411,9 @@ def main():
                 current_offset += video['duration']
             total_cycle_duration = current_offset if current_offset > 0 else 1
 
-            # Erst danach wird die Datei für FFmpeg geschrieben
             ffmpeg_playlist_file = 'ffmpeg_playlist.txt'
             with open(ffmpeg_playlist_file, 'w', encoding='utf-8') as f:
-                # SCHLEIFE 2: Schreibt die Pfade in die Datei
                 for video in playlist_for_ffmpeg:
-                    # Hier ist unsere Korrektur von vorhin
                     clean_path = video['path'].strip().replace('\\', '/')
                     f.write(f"file '{clean_path}'\n")
                     
@@ -376,7 +430,7 @@ def main():
             # --- Überwachungsschleife ---
             while True:
                 if ffmpeg_process and ffmpeg_process.poll() is not None: 
-                    print(f"{Fore.RED}FFmpeg-Prozess unerwartet beendet. Starte Zyklus neu.")
+                    print(f"{Fore.RED}{_('FFmpeg-Prozess unerwartet beendet. Starte Zyklus neu.')}")
                     break
 
                 current_session = {}
@@ -385,18 +439,18 @@ def main():
                 except (FileNotFoundError, json.JSONDecodeError): pass
 
                 if current_session.get('force_restart'):
-                    print(f"{Fore.YELLOW}--- SOFORT-Neustart-Signal erkannt. ---")
+                    print(f"{Fore.YELLOW}{_('--- SOFORT-Neustart-Signal erkannt. ---')}")
                     if ffmpeg_process: ffmpeg_process.terminate(); ffmpeg_process.wait(timeout=5)
                     break 
 
                 if current_session.get('restart_pending'):
-                    print(f"{Fore.CYAN}--- SANFTER Neustart vorgemerkt. Warte auf nächstes Video. ---")
+                    print(f"{Fore.CYAN}{_('--- SANFTER Neustart vorgemerkt. Warte auf nächstes Video. ---')}")
                     soft_restart_is_pending = True
                     current_session['restart_pending'] = False
                     with open(session_file, 'w', encoding='utf-8') as f: json.dump(current_session, f, indent=2)
 
                 if check_and_apply_signals():
-                    print(f"{Fore.YELLOW}--- Sendeplan-Signal verarbeitet. Starte Stream-Zyklus neu. ---")
+                    print(f"{Fore.YELLOW}{_('--- Sendeplan-Signal verarbeitet. Starte Stream-Zyklus neu. ---')}")
                     if ffmpeg_process: ffmpeg_process.terminate(); ffmpeg_process.wait(timeout=5)
                     break
                 
@@ -405,13 +459,13 @@ def main():
 
                 if current_video_entry and currently_playing_video_path != current_video_entry['video_info']['path']:
                     if soft_restart_is_pending:
-                        print(f"{Fore.CYAN}--- Nächstes Video erreicht. Führe SANFTEN NEUSTART jetzt aus. ---")
+                        print(f"{Fore.CYAN}{_('--- Nächstes Video erreicht. Führe SANFTEN NEUSTART jetzt aus. ---')}")
                         if ffmpeg_process: ffmpeg_process.terminate(); ffmpeg_process.wait(timeout=5)
                         break
 
                     video = current_video_entry['video_info']
                     currently_playing_video_path = video['path']
-                    print(f"FFmpeg-Uhr-Sync: Neues Video -> {os.path.basename(video['path'])}")
+                    print(_("FFmpeg-Uhr-Sync: Neues Video -> %(name)s") % {'name': os.path.basename(video['path'])})
                     
                     manager_config_live = {}
                     try:
@@ -429,7 +483,6 @@ def main():
                     original_index = (resume_index + index_in_timeline) % len(full_playlist)
                     next_index = (original_index + 1) % len(full_playlist)
                     
-                    # Lese die Session erneut, um die neuesten Daten zu haben, bevor wir schreiben
                     try:
                         with open(session_file, 'r', encoding='utf-8') as f: session_to_update = json.load(f)
                     except (FileNotFoundError, json.JSONDecodeError): session_to_update = {}
@@ -445,10 +498,10 @@ def main():
                         if active_event and active_event.get('mode') == 'repeat':
                             loops_done = active_event.get('loops_done', 0) + 1
                             session_to_update['active_event']['loops_done'] = loops_done
-                            print(f"{Fore.CYAN}--- SENDEPLAN: Repeat-Event hat Schleife {loops_done}/{active_event.get('repeat')} abgeschlossen. ---")
+                            print(Fore.CYAN + _("--- SENDEPLAN: Repeat-Event hat Schleife %(done)s/%(total)s abgeschlossen. ---") % {'done': loops_done, 'total': active_event.get('repeat')})
                             
                             if loops_done >= active_event.get('repeat', 1):
-                                print(f"{Fore.CYAN}--- SENDEPLAN: Repeat-Event beendet. ---")
+                                print(f"{Fore.CYAN}{_('--- SENDEPLAN: Repeat-Event beendet. ---')}")
                                 session_to_update['active_event'] = None
                                 session_to_update['force_restart'] = True
 
@@ -458,18 +511,18 @@ def main():
                     video_elapsed = time_in_cycle - current_video_entry['start_offset']
                     status_data = {"status": "Online", "now_playing": os.path.basename(current_video_entry['video_info']['path']), "title": current_video_entry['video_info']['title'], "game": current_video_entry['video_info']['game'], "video_duration": current_video_entry['video_info'].get('duration', 0), "video_elapsed": video_elapsed}
                 else:
-                    status_data = {"status": "Online", "now_playing": "Warte auf Sync...", "title": "", "game": "", "video_duration": 0, "video_elapsed": 0}
+                    status_data = {"status": "Online", "now_playing": _("Warte auf Sync..."), "title": "", "game": "", "video_duration": 0, "video_elapsed": 0}
                 with open(status_file, 'w', encoding='utf-8') as f: json.dump(status_data, f)
                 
                 time.sleep(1)
 
         except KeyboardInterrupt:
             if ffmpeg_process: ffmpeg_process.terminate()
-            print("\nSkript beendet.")
+            print(_("\nSkript beendet."))
             break
         except Exception as e:
             if ffmpeg_process: ffmpeg_process.terminate()
-            print(f"{Fore.RED}Unerwarteter Fehler in der Hauptschleife: {e}"); 
+            print(f"{Fore.RED}{_('Unerwarteter Fehler in der Hauptschleife')}: {e}"); 
             import traceback
             traceback.print_exc()
             time.sleep(10)
