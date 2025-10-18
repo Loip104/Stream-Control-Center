@@ -9,3 +9,9 @@ colorama
 
 # psutil für plattformunabhängige Prozesssteuerung
 psutil
+
+# Die magie hinter Sprachen
+Flask-Babel
+
+# Für Api aufrufe Zwingend notwendig
+pyOpenSSL
