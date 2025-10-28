@@ -1,0 +1,1984 @@
+# English translations for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-10-28 20:41+0100\n"
+"PO-Revision-Date: 2025-10-17 01:28+0200\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: en\n"
+"Language-Team: en <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: web_manager.py:72
+msgid "Auto-Restart Monitor Thread gestartet."
+msgstr "Automatically restart monitor thread."
+
+#: web_manager.py:117
+#, python-format
+msgid "Auto-Restart (Intervall): Zeitlimit (%(hours)sh) erreicht."
+msgstr "Auto-Restart (Interval): Time limit (%(hours)sh) reached."
+
+#: web_manager.py:134
+#, python-format
+msgid "Auto-Restart (Uhrzeit): Fester Zeitpunkt (%(time)s) erreicht."
+msgstr "Auto-Restart (time): Fixed time (%(time)s) reached."
+
+#: web_manager.py:140
+msgid "Sende 'force_restart' Signal an Streamer..."
+msgstr "Send 'force_restart' signal to streamer..."
+
+#: web_manager.py:161
+#, fuzzy, python-format
+msgid "Fehler im Auto-Restart-Thread: %(error)s"
+msgstr "Error starting streamer script: %(error)s"
+
+#: web_manager.py:180
+msgid ""
+"Fehler: Zuerst muss eine Client-ID in der Streamer-Config gespeichert "
+"werden."
+msgstr "Error: A Client-ID must be saved in the Streamer-Config first."
+
+#: web_manager.py:183 web_manager.py:216
+#, fuzzy
+msgid "Fehler: Konnte Konfigurationsdateien nicht laden."
+msgstr "Manager configuration not found."
+
+#: web_manager.py:198
+msgid "Autorisierung fehlgeschlagen oder vom Benutzer abgelehnt."
+msgstr "Authorization failed or rejected by the user."
+
+#: web_manager.py:212
+msgid ""
+"Fehler: Client-ID und Client Secret müssen zuerst in der Config "
+"gespeichert werden."
+msgstr "Error: Client ID and Client Secret must first be saved in the config."
+
+#: web_manager.py:227
+msgid "Erfolgreich mit Twitch verbunden! Die Tokens wurden gespeichert."
+msgstr "Successfully connected to Twitch! Tokens saved."
+
+#: web_manager.py:229
+#, fuzzy
+msgid "Fehler beim Speichern der Tokens."
+msgstr "Error saving preset."
+
+#: web_manager.py:231
+msgid ""
+"Fehler: Konnte die Tokens nicht von Twitch erhalten. Überprüfe die "
+"Konsolenausgabe."
+msgstr "Error: Could not receive tokens from Twitch. Check your console output."
+
+#: web_manager.py:245
+msgid "Manager-Konfiguration nicht gefunden."
+msgstr "Manager configuration not found."
+
+#: web_manager.py:250
+msgid "Keine Video-Verzeichnisse in der Manager-Konfiguration festgelegt."
+msgstr "No video directories specified in manager configuration."
+
+#: web_manager.py:278
+#, python-format
+msgid "%(count)s neue(s) Video(s) wurde(n) zur Bibliothek hinzugefügt."
+msgstr "%(count)s new video(s) added to library."
+
+#: web_manager.py:280
+msgid "Keine neuen Videos in den konfigurierten Verzeichnissen gefunden."
+msgstr "No new videos found in configured directories."
+
+#: web_manager.py:355
+msgid ""
+"Fehler: Kein Video-Ordner in der Manager-Konfiguration festgelegt. Import"
+" nicht möglich."
+msgstr ""
+"Error: No video folder specified in manager configuration. Import not "
+"possible."
+
+#: web_manager.py:408
+msgid "Keine Videos zum Erstellen der Playlist ausgewählt."
+msgstr "No videos selected to create playlist."
+
+#: web_manager.py:411 web_manager.py:1475
+msgid "Bitte gib einen Namen für die neue Playlist an."
+msgstr "Please provide a name for the new playlist."
+
+#: web_manager.py:420
+#, python-format
+msgid "Eine Playlist mit dem Namen '%(filename)s' existiert bereits."
+msgstr "A playlist with the name '%(filename)s' already exists."
+
+#: web_manager.py:447
+#, python-format
+msgid "Playlist '%(filename)s' wurde mit %(count)s Videos erfolgreich erstellt!"
+msgstr "Playlist '%(filename)s' successfully created with %(count)s videos!"
+
+#: web_manager.py:450
+#, python-format
+msgid "Fehler beim Erstellen der Playlist: %(error)s"
+msgstr "Error creating playlist: %(error)s"
+
+#: web_manager.py:461
+msgid "Keine Videos zum Hinzufügen ausgewählt."
+msgstr "No videos selected to add."
+
+#: web_manager.py:464
+msgid "Keine Ziel-Playlist ausgewählt."
+msgstr "No target playlist selected."
+
+#: web_manager.py:491
+#, python-format
+msgid "%(count)s Video(s) wurden zur Playlist '%(playlist)s' hinzugefügt."
+msgstr "%(count)s video(s) added to playlist '%(playlist)s'."
+
+#: web_manager.py:493
+msgid "Die ausgewählten Videos sind bereits in der Playlist vorhanden."
+msgstr "The selected videos are already in the playlist."
+
+#: web_manager.py:506
+msgid "Signal 'Nächster Titel' gesendet."
+msgstr "Signal 'Next Track' sent."
+
+#: web_manager.py:508 web_manager.py:538
+#, python-format
+msgid "Fehler beim Senden des Signals: %(error)s"
+msgstr "Error sending signal: %(error)s"
+
+#: web_manager.py:536
+msgid "Signal 'Playlist Neustart' gesendet."
+msgstr "Signal 'Playlist Restart' sent."
+
+#: web_manager.py:550
+msgid "Fehlende Informationen für die Umbenennung."
+msgstr "Missing information for renaming."
+
+#: web_manager.py:557
+msgid "Video nicht in der Datenbank gefunden."
+msgstr "Video not found in database."
+
+#: web_manager.py:571
+msgid "Der neue Name ist identisch mit dem alten."
+msgstr "The new name is identical to the old one."
+
+#: web_manager.py:575
+#, python-format
+msgid "Eine Datei mit dem Namen '%(filename)s' existiert bereits."
+msgstr "A file with the name '%(filename)s' already exists."
+
+#: web_manager.py:595
+#, python-format
+msgid "Video erfolgreich in '%(filename)s' umbenannt."
+msgstr "Video successfully renamed to '%(filename)s'."
+
+#: web_manager.py:598
+#, python-format
+msgid "Fehler beim Umbenennen: %(error)s"
+msgstr "Error renaming: %(error)s"
+
+#: web_manager.py:626
+msgid "Der Streamer-Prozess läuft bereits!"
+msgstr "The streamer process is already running!"
+
+#: web_manager.py:661
+msgid "Streamer-Skript wurde erfolgreich gestartet!"
+msgstr "Streamer script successfully started!"
+
+#: web_manager.py:664
+#, python-format
+msgid "Fehler beim Starten des Streamer-Skripts: %(error)s"
+msgstr "Error starting streamer script: %(error)s"
+
+#: web_manager.py:671
+msgid "Log-Datei (ffmpeg.log) nicht gefunden."
+msgstr "Log file (ffmpeg.log) not found."
+
+#: web_manager.py:691
+msgid "PID-Datei nicht gefunden. Der Streamer lief vermutlich bereits nicht mehr."
+msgstr "PID file not found. The streamer was probably not running anymore."
+
+#: web_manager.py:706
+msgid "Streamer-Skript wurde erfolgreich gestoppt."
+msgstr "Streamer script successfully stopped."
+
+#: web_manager.py:710
+msgid "Streamer-Prozess reagierte nicht und wurde erzwungen beendet."
+msgstr "Streamer process did not respond and was forcefully terminated."
+
+#: web_manager.py:713 web_manager.py:1283
+msgid "Prozess nicht gefunden, war bereits beendet."
+msgstr "Process not found, was already terminated."
+
+#: web_manager.py:715
+#, python-format
+msgid "Fehler beim Stoppen des Streamer-Skripts: %(error)s"
+msgstr "Error stopping streamer script: %(error)s"
+
+#: web_manager.py:730
+msgid "Keine Videos zum Löschen ausgewählt."
+msgstr "No videos selected for deletion."
+
+#: web_manager.py:743
+msgid "Fehler: Keine Video-Verzeichnisse konfiguriert. Löschen nicht möglich."
+msgstr "Error: No video directories configured. Deletion not possible."
+
+#: web_manager.py:776
+#, python-format
+msgid "%(count)s Video(s) wurden permanent gelöscht."
+msgstr "%(count)s video(s) permanently deleted."
+
+#: web_manager.py:778
+#, python-format
+msgid "%(count)s Video(s) konnten nicht gelöscht werden. Siehe Log für Details."
+msgstr "%(count)s video(s) could not be deleted. See log for details."
+
+#: web_manager.py:813
+#, python-format
+msgid "Fehler beim Lesen der Playlist '%(playlist)s': %(error)s"
+msgstr "Error reading playlist '%(playlist)s': %(error)s"
+
+#: web_manager.py:821
+#, python-format
+msgid "Analyse abgeschlossen. %(count)s ungenutzte Video(s) gefunden."
+msgstr "Analysis complete. %(count)s unused video(s) found."
+
+#: web_manager.py:832
+msgid "Fehlende Daten zum Entfernen des Eintrags."
+msgstr "Missing data to remove entry."
+
+#: web_manager.py:841
+msgid "Die zu bearbeitende Playlist wurde nicht gefunden."
+msgstr "The playlist to edit was not found."
+
+#: web_manager.py:860
+msgid "Video-Eintrag wurde aus der Playlist entfernt."
+msgstr "Video entry removed from playlist."
+
+#: web_manager.py:863
+msgid "Ungültiger Index zum Entfernen des Eintrags."
+msgstr "Invalid index to remove entry."
+
+#: web_manager.py:865
+#, python-format
+msgid "Fehler beim Entfernen des Eintrags: %(error)s"
+msgstr "Error removing entry: %(error)s"
+
+#: web_manager.py:915
+msgid "Fehlende Daten zum Speichern der Rotation."
+msgstr "Missing data to save rotation."
+
+#: web_manager.py:969
+#, python-format
+msgid "Rotation '%(rotation_name)s' gespeichert und als Playlist kompiliert."
+msgstr "Rotation '%(rotation_name)s' saved and compiled as playlist."
+
+#: web_manager.py:972
+#, python-format
+msgid "Ein unerwarteter Fehler ist aufgetreten: %(error)s"
+msgstr "An unexpected error occurred: %(error)s"
+
+#: web_manager.py:984
+msgid "Keine Rotation zum Löschen ausgewählt."
+msgstr "No rotation selected for deletion."
+
+#: web_manager.py:993
+#, python-format
+msgid "Rotation '%(rotation_name)s' wurde gelöscht."
+msgstr "Rotation '%(rotation_name)s' deleted."
+
+#: web_manager.py:995
+msgid "Zu löschende Rotation nicht gefunden."
+msgstr "Rotation to delete not found."
+
+#: web_manager.py:997
+#, python-format
+msgid "Fehler beim Löschen der Rotation: %(error)s"
+msgstr "Error deleting rotation: %(error)s"
+
+#: web_manager.py:1008
+msgid "Fehlende Informationen zum Duplizieren."
+msgstr "Missing information to duplicate."
+
+#: web_manager.py:1016
+msgid "Playlist nicht gefunden."
+msgstr "Playlist not found."
+
+#: web_manager.py:1033
+msgid "Eintrag erfolgreich dupliziert."
+msgstr "Entry successfully duplicated."
+
+#: web_manager.py:1036
+#, python-format
+msgid "Fehler beim Duplizieren des Eintrags: %(error)s"
+msgstr "Error duplicating entry: %(error)s"
+
+#: web_manager.py:1211
+msgid "Log-Datei (streamer.log) nicht gefunden."
+msgstr "Log file (streamer.log) not found."
+
+#: web_manager.py:1224
+msgid "Der Bot-Prozess läuft bereits!"
+msgstr "The bot process is already running!"
+
+#: web_manager.py:1227
+msgid "Starte Bot-Skript (twitch_bot.py)..."
+msgstr "Starting bot script (twitch_bot.py)..."
+
+#: web_manager.py:1249
+msgid "Bot-Skript wurde erfolgreich gestartet!"
+msgstr "Bot script successfully started!"
+
+#: web_manager.py:1252
+#, python-format
+msgid "Fehler beim Starten des Bot-Skripts: %(error)s"
+msgstr "Error starting bot script: %(error)s"
+
+#: web_manager.py:1258
+msgid "Chat-Log (chat.log) nicht gefunden."
+msgstr "Chat log (chat.log) not found."
+
+#: web_manager.py:1271
+msgid "Der Bot-Prozess lief bereits nicht mehr."
+msgstr "The bot process was not running anymore."
+
+#: web_manager.py:1281
+msgid "Bot-Skript wurde erfolgreich gestoppt."
+msgstr "Bot script successfully stopped."
+
+#: web_manager.py:1285
+#, python-format
+msgid "Fehler beim Stoppen des Bot-Skripts: %(error)s"
+msgstr "Error stopping bot script: %(error)s"
+
+#: web_manager.py:1293
+msgid "Log-Datei (bot.log) nicht gefunden."
+msgstr "Log file (bot.log) not found."
+
+#: web_manager.py:1312
+msgid "Neue Videos wurden erfolgreich importiert!"
+msgstr "New videos successfully imported!"
+
+#: web_manager.py:1314
+msgid "Keine neuen Videos im '_neu_'-Ordner gefunden."
+msgstr "No new videos found in '_neu_' folder."
+
+#: web_manager.py:1341
+#, python-format
+msgid ""
+"Warnung: Video-Verzeichnis '%(dir)s' konnte nicht gelesen werden: "
+"%(error)s"
+msgstr "Warning: Video directory '%(dir)s' could not be read: %(error)s"
+
+#: web_manager.py:1364
+#, python-format
+msgid ""
+"%(count)s neue(s) Thumbnail(s) wurde(n) mit der Skalierung %(scale)s "
+"erstellt!"
+msgstr "%(count)s new thumbnail(s) created with scaling %(scale)s!"
+
+#: web_manager.py:1388
+msgid "Playlist wurde erfolgreich gemischt!"
+msgstr "Playlist successfully shuffled!"
+
+#: web_manager.py:1390
+#, python-format
+msgid "Fehler beim Mischen der Playlist: %(error)s"
+msgstr "Error shuffling playlist: %(error)s"
+
+#: web_manager.py:1416
+msgid "Alle Videos wurden aktiviert!"
+msgstr "All videos activated!"
+
+#: web_manager.py:1418
+#, python-format
+msgid "Fehler beim Aktivieren aller Videos: %(error)s"
+msgstr "Error activating all videos: %(error)s"
+
+#: web_manager.py:1444
+msgid "Alle Videos wurden deaktiviert!"
+msgstr "All videos deactivated!"
+
+#: web_manager.py:1446
+#, python-format
+msgid "Fehler beim Deaktivieren aller Videos: %(error)s"
+msgstr "Error deactivating all videos: %(error)s"
+
+#: web_manager.py:1465
+msgid ""
+"Playlist gespeichert! Der Stream wird nach dem aktuellen Video neu "
+"gestartet."
+msgstr "Playlist saved! Stream will restart after current video."
+
+#: web_manager.py:1467
+#, python-format
+msgid "Fehler beim Speichern: %(error)s"
+msgstr "Error saving: %(error)s"
+
+#: web_manager.py:1481
+#, python-format
+msgid "Eine Playlist mit dem Namen '%(name)s' existiert bereits."
+msgstr "A playlist with the name '%(name)s' already exists."
+
+#: web_manager.py:1492
+#, python-format
+msgid "Playlist erfolgreich als '%(name)s' gespeichert!"
+msgstr "Playlist successfully saved as '%(name)s'!"
+
+#: web_manager.py:1494
+#, python-format
+msgid "Fehler beim Speichern der neuen Playlist: %(error)s"
+msgstr "Error saving new playlist: %(error)s"
+
+#: web_manager.py:1511
+#, python-format
+msgid "Fehler: Playlist '%(filename)s' konnte nicht gefunden werden."
+msgstr "Error: Playlist '%(filename)s' could not be found."
+
+#: web_manager.py:1534
+#, python-format
+msgid "'%s' wird nach dem aktuellen Video aktiviert."
+msgstr "'%s' will be activated after current video."
+
+#: web_manager.py:1537
+#, python-format
+msgid "'%s' wird jetzt aktiviert. Stream startet neu."
+msgstr "'%s' is now activated. Stream restarting."
+
+#: web_manager.py:1540
+#, python-format
+msgid "'%s' aktiviert."
+msgstr "'%s' activated."
+
+#: web_manager.py:1547
+#, python-format
+msgid "Fehler beim Aktivieren der Playlist: %(error)s"
+msgstr "Error activating playlist: %(error)s"
+
+#: web_manager.py:1571
+#, python-format
+msgid "Fehler: Die aktive Playlist '%(filename)s' kann nicht gelöscht werden."
+msgstr "Error: The active playlist '%(filename)s' cannot be deleted."
+
+#: web_manager.py:1585
+#, python-format
+msgid "Playlist '%(filename)s' wurde erfolgreich gelöscht."
+msgstr "Playlist '%(filename)s' successfully deleted."
+
+#: web_manager.py:1587
+#, python-format
+msgid "Fehler beim Löschen der Playlist: %(error)s"
+msgstr "Error deleting playlist: %(error)s"
+
+#: web_manager.py:1603
+msgid "Keine zu bearbeitende Playlist-ID übermittelt."
+msgstr "No playlist ID to edit provided."
+
+#: web_manager.py:1608
+#, python-format
+msgid "Playlist mit ID '%(id)s' nicht gefunden."
+msgstr "Playlist with ID '%(id)s' not found."
+
+#: web_manager.py:1627
+#, python-format
+msgid "Änderungen in Playlist '%(name)s' erfolgreich gespeichert!"
+msgstr "Changes in playlist '%(name)s' successfully saved!"
+
+#: web_manager.py:1632
+msgid "Ein unerwarteter Fehler ist aufgetreten."
+msgstr "An unexpected error occurred."
+
+#: web_manager.py:1649
+msgid "Playlist gespeichert! Neustart-Signal wurde gesendet."
+msgstr "Playlist saved! Restart signal sent."
+
+#: web_manager.py:1651
+#, python-format
+msgid "Fehler beim Speichern der Playlist: %(error)s"
+msgstr "Error saving playlist: %(error)s"
+
+#: web_manager.py:1679
+msgid "Manager-Konfiguration erfolgreich gespeichert!"
+msgstr "Manager configuration successfully saved!"
+
+#: web_manager.py:1681
+#, python-format
+msgid "Fehler beim Speichern der Manager-Konfiguration: %(error)s"
+msgstr "Error saving manager configuration: %(error)s"
+
+#: web_manager.py:1728
+msgid "Sendeplan erfolgreich gespeichert!"
+msgstr "Schedule successfully saved!"
+
+#: web_manager.py:1731
+#, python-format
+msgid "Fehler beim Speichern des Sendeplans: %(error)s"
+msgstr "Error saving schedule: %(error)s"
+
+#: web_manager.py:1740
+msgid "Keine Datei im Request gefunden."
+msgstr "No file found in request."
+
+#: web_manager.py:1745
+msgid "Keine Datei ausgewählt."
+msgstr "No file selected."
+
+#: web_manager.py:1754
+#, python-format
+msgid "Eine Schriftart mit dem Namen '%(filename)s' existiert bereits."
+msgstr "A font with the name '%(filename)s' already exists."
+
+#: web_manager.py:1757
+#, python-format
+msgid "Schriftart '%(filename)s' erfolgreich hochgeladen!"
+msgstr "Font '%(filename)s' successfully uploaded!"
+
+#: web_manager.py:1759
+msgid "Ungültiger Dateityp. Nur .ttf und .otf sind erlaubt."
+msgstr "Invalid file type. Only .ttf and .otf are allowed."
+
+#: web_manager.py:1767
+msgid "Kein Schriftart-Name übergeben."
+msgstr "No font name provided."
+
+#: web_manager.py:1773
+msgid "Ungültiger Schriftart-Name."
+msgstr "Invalid font name."
+
+#: web_manager.py:1781
+#, python-format
+msgid "Schriftart '%(name)s' wurde gelöscht."
+msgstr "Font '%(name)s' deleted."
+
+#: web_manager.py:1783
+msgid "Zu löschende Schriftart nicht gefunden."
+msgstr "Font to delete not found."
+
+#: web_manager.py:1785
+#, python-format
+msgid "Fehler beim Löschen der Schriftart: %(error)s"
+msgstr "Error deleting font: %(error)s"
+
+#: web_manager.py:1858
+msgid "Ein unerwarteter Fehler beim Speichern ist aufgetreten."
+msgstr "An unexpected error occurred while saving."
+
+#: web_manager.py:1866
+msgid "Preset-Name darf nicht leer sein."
+msgstr "Preset name cannot be empty."
+
+#: web_manager.py:1884
+msgid "Fehler beim Speichern des Presets."
+msgstr "Error saving preset."
+
+#: web_manager.py:1893
+msgid "Kein Preset zum Laden ausgewählt."
+msgstr "No preset selected to load."
+
+#: web_manager.py:1905 web_manager.py:1930
+#, python-format
+msgid "Preset '%(name)s' nicht gefunden."
+msgstr "Preset '%(name)s' not found."
+
+#: web_manager.py:1907
+msgid "Fehler beim Laden des Presets."
+msgstr "Error loading preset."
+
+#: web_manager.py:1915
+msgid "Kein Preset zum Löschen ausgewählt."
+msgstr "No preset selected to delete."
+
+#: web_manager.py:1922
+msgid "Preset-Datei nicht gefunden."
+msgstr "Preset file not found."
+
+#: web_manager.py:1933
+msgid "Fehler beim Löschen des Presets."
+msgstr "Error deleting preset."
+
+#: templates/index.html:132 twitch_bot.py:84 web_manager.py:1965
+msgid "N/A"
+msgstr "N/A"
+
+#: web_manager.py:2046
+msgid "Geplantes Event"
+msgstr "Scheduled Event"
+
+#: web_manager.py:2062
+msgid "Fehler: Ein Befehl muss mit '!' beginnen."
+msgstr "Error: A command must start with '!'."
+
+#: web_manager.py:2092
+#, python-format
+msgid "Befehl '%(name)s' erfolgreich hinzugefügt!"
+msgstr "Command '%(name)s' successfully added!"
+
+#: web_manager.py:2094
+#, python-format
+msgid "Fehler beim Hinzufügen des Befehls: %(error)s"
+msgstr "Error adding command: %(error)s"
+
+#: web_manager.py:2110
+msgid "Befehlsdatei nicht gefunden."
+msgstr "Command file not found."
+
+#: web_manager.py:2117
+#, python-format
+msgid "Befehl '%(name)s' erfolgreich gelöscht!"
+msgstr "Command '%(name)s' successfully deleted!"
+
+#: web_manager.py:2119
+msgid "Zu löschender Befehl nicht gefunden."
+msgstr "Command to delete not found."
+
+#: web_manager.py:2122
+#, python-format
+msgid "Fehler beim Löschen des Befehls: %(error)s"
+msgstr "Error deleting command: %(error)s"
+
+#: web_manager.py:2146
+msgid "API-FEHLER: Twitch Client-ID oder Token für Spielsuche nicht verfügbar."
+msgstr "API ERROR: Twitch Client ID or Match Finder Token not available."
+
+#: web_manager.py:2170
+#, fuzzy, python-format
+msgid "Fehler bei der Twitch-Spielsuche: %(error)s"
+msgstr "Error saving: %(error)s"
+
+#: stream_v3.py:69
+msgid "FEHLER: Konnte keinen gültigen Token für die User-ID-Abfrage erhalten."
+msgstr "ERROR: Could not obtain a valid token for the user ID query."
+
+#: stream_v3.py:83
+#, python-format
+msgid "Twitch User-ID für '%(user)s' erfolgreich abgerufen."
+msgstr "Successfully retrieved Twitch User-ID for '%(user)s'."
+
+#: stream_v3.py:86
+#, fuzzy, python-format
+msgid "FEHLER: Twitch User '%(user)s' nicht gefunden."
+msgstr "Twitch User '%(user)s' not found."
+
+#: stream_v3.py:89
+#, fuzzy, python-format
+msgid "Fehler beim Abrufen der User-ID: %(error)s"
+msgstr "Error retrieving User-ID"
+
+#: stream_v3.py:98
+msgid "FEHLER: Konnte keinen gültigen Token für die Game-ID-Abfrage erhalten."
+msgstr "ERROR: Could not obtain a valid token for the Game ID query."
+
+#: stream_v3.py:114
+#, fuzzy, python-format
+msgid "WARNUNG: Spiel '%(game)s' wurde auf Twitch nicht gefunden."
+msgstr "Game '%(game)s' was not found on Twitch."
+
+#: stream_v3.py:117
+#, fuzzy, python-format
+msgid "Fehler bei der Spielsuche: %(error)s"
+msgstr "Error saving: %(error)s"
+
+#: stream_v3.py:126
+msgid ""
+"FEHLER: Konnte keinen gültigen Twitch-Token erhalten. Metadaten werden "
+"nicht aktualisiert."
+msgstr "ERROR: Could not obtain a valid Twitch token." "Metadata is not being updated."
+
+#: stream_v3.py:129
+#, python-format
+msgid "Aktualisiere Twitch-Metadaten -> Titel: %(title)s | Spiel: %(game)s"
+msgstr "Updating Twitch metadata -> Title: %(title)s | Game: %(game)s"
+
+#: stream_v3.py:146
+#, fuzzy, python-format
+msgid "Fehler beim Aktualisieren der Stream-Info: %(error)s"
+msgstr "Error updating stream info"
+
+#: stream_v3.py:161
+msgid "Starte FFmpeg im Remux-Modus (Kopieren)"
+msgstr "Starting FFmpeg in remux mode (copy)"
+
+#: stream_v3.py:165
+msgid "Starte FFmpeg im Transcode-Modus"
+msgstr "Starting FFmpeg in transcode mode"
+
+#: stream_v3.py:223
+msgid "--- SENDEPLAN: Zeit-Event beendet. ---"
+msgstr "--- SCHEDULE: Time event finished. ---"
+
+#: stream_v3.py:230
+#, python-format
+msgid "--- SENDEPLAN: Kehre zurück zu Playlist '%(name)s' ---"
+msgstr "--- SCHEDULE: Returning to playlist '%(name)s' ---"
+
+#: stream_v3.py:246
+#, python-format
+msgid "WARNUNG: Playlist-ID '%(id)s' aus Sendeplan nicht gefunden."
+msgstr "WARNING: Playlist-ID '%(id)s' from schedule not found."
+
+#: stream_v3.py:249
+#, python-format
+msgid "--- SENDEPLAN: Starte Event für Playlist '%(name)s' ---"
+msgstr "--- SCHEDULE: Starting event for playlist '%(name)s' ---"
+
+#: stream_v3.py:301
+msgid "Streamer V6.5 (Echter Sanfter Neustart) gestartet."
+msgstr "Streamer V6.5 (True Soft Restart) started."
+
+#: stream_v3.py:318
+msgid "Prozess-Startzeit in session.json vermerkt."
+msgstr "Process start time noted in session.json."
+
+#: stream_v3.py:320
+#, fuzzy
+msgid "Fehler beim Schreiben der Prozess-Startzeit"
+msgstr "Error deleting preset:"
+
+#: stream_v3.py:338
+msgid "FEHLER: videos.json oder playlists.json nicht gefunden."
+msgstr "ERROR: videos.json or playlists.json not found."
+
+#: stream_v3.py:346
+msgid "Warnung: Keine gültige active_playlist_id in session.json. Nutze Fallback."
+msgstr "Warning: No valid active_playlist_id in session.json. Using fallback."
+
+#: stream_v3.py:358
+msgid "FEHLER: Konnte keine aktive Playlist ermitteln."
+msgstr "ERROR: Could not determine active playlist."
+
+#: stream_v3.py:362
+#, python-format
+msgid "--- Lade aktive Playlist: '%(filename)s' (ID: %(id)s) ---"
+msgstr "--- Loading active playlist: '%(filename)s' (ID: %(id)s) ---"
+
+#: stream_v3.py:381
+msgid "--- Überprüfe Videodateien via ID-System ---"
+msgstr "--- Checking video files via ID system ---"
+
+#: stream_v3.py:395
+#, python-format
+msgid "WARNUNG (Zeile %(line)s): Video-ID '%(id)s' nicht in videos.json gefunden."
+msgstr "WARNING (Line %(line)s): Video-ID '%(id)s' not found in videos.json."
+
+#: stream_v3.py:400
+#, python-format
+msgid ""
+"WARNUNG (Zeile %(line)s): Videopfad für ID '%(id)s' nicht gefunden: "
+"%(path)s"
+msgstr "WARNING (Line %(line)s): Video path for ID '%(id)s' not found: %(path)s"
+
+#: stream_v3.py:412
+#, python-format
+msgid ""
+"WARNUNG: Zeile %(line)s in Playlist konnte nicht gelesen werden und wird "
+"übersprungen. Fehler: %(error)s"
+msgstr ""
+"WARNING: Line %(line)s in playlist could not be read and will be skipped."
+" Error: %(error)s"
+
+#: stream_v3.py:443
+msgid "FFmpeg-Prozess unerwartet beendet. Starte Zyklus neu."
+msgstr "FFmpeg process ended unexpectedly. Restarting cycle."
+
+#: stream_v3.py:453
+msgid "--- SOFORT-Neustart-Signal erkannt. ---"
+msgstr "--- IMMEDIATE restart signal detected. ---"
+
+#: stream_v3.py:459
+msgid "Erzwinge 2 Minuten Offline-Zeit, um 48h-Sitzung zurückzusetzen..."
+msgstr "Force 2 minutes offline time to reset 48h session..."
+
+#: stream_v3.py:462
+#, fuzzy
+msgid "Geplanter Neustart..."
+msgstr "Playlist Restart"
+
+#: stream_v3.py:474
+#, fuzzy
+msgid "Neustart-Flag erfolgreich zurückgesetzt."
+msgstr "Entry successfully duplicated."
+
+#: stream_v3.py:476
+#, fuzzy
+msgid "Fehler beim Zurücksetzen des Neustart-Flags"
+msgstr "Error retrieving User-ID"
+
+#: stream_v3.py:483
+msgid "--- SANFTER Neustart vorgemerkt. Warte auf nächstes Video. ---"
+msgstr "--- SOFT restart scheduled. Waiting for next video. ---"
+
+#: stream_v3.py:489
+msgid "--- Sendeplan-Signal verarbeitet. Starte Stream-Zyklus neu. ---"
+msgstr "--- Schedule signal processed. Restarting stream cycle. ---"
+
+#: stream_v3.py:498
+msgid "--- Nächstes Video erreicht. Führe SANFTEN NEUSTART jetzt aus. ---"
+msgstr "--- Next video reached. Executing SOFT RESTART now. ---"
+
+#: stream_v3.py:504
+#, python-format
+msgid "FFmpeg-Uhr-Sync: Neues Video -> %(name)s"
+msgstr "FFmpeg clock sync: New video -> %(name)s"
+
+#: stream_v3.py:537
+#, python-format
+msgid ""
+"--- SENDEPLAN: Repeat-Event hat Schleife %(done)s/%(total)s "
+"abgeschlossen. ---"
+msgstr "--- SCHEDULE: Repeat event completed loop %(done)s/%(total)s. ---"
+
+#: stream_v3.py:540
+msgid "--- SENDEPLAN: Repeat-Event beendet. ---"
+msgstr "--- SCHEDULE: Repeat event finished. ---"
+
+#: stream_v3.py:550
+msgid "Warte auf Sync..."
+msgstr "Waiting for sync..."
+
+#: stream_v3.py:557
+msgid ""
+"\n"
+"Skript beendet."
+msgstr ""
+"\n"
+"Script terminated."
+
+#: stream_v3.py:561
+msgid "Unerwarteter Fehler in der Hauptschleife"
+msgstr "Unexpected error in main loop"
+
+#: twitch_bot.py:36
+#, python-format
+msgid "Warnung: %(filename)s nicht gefunden oder fehlerhaft."
+msgstr "Warning: %(filename)s not found or corrupted."
+
+#: twitch_bot.py:42
+msgid "BOT SENDET"
+msgstr "BOT SENDING"
+
+#: twitch_bot.py:56
+msgid "Aktion 'stream_control' wird ausgeführt"
+msgstr "Executing action 'stream_control'"
+
+#: twitch_bot.py:75
+#, python-format
+msgid "Signal '%(command)s' erfolgreich in %(file)s geschrieben."
+msgstr "Signal '%(command)s' successfully written to %(file)s."
+
+#: twitch_bot.py:78
+#, python-format
+msgid "Fehler beim Schreiben der %(file)s: "
+msgstr "Error writing %(file)s: "
+
+#: twitch_bot.py:83
+msgid "Aktion 'chat_reply' wird ausgeführt."
+msgstr "Executing action 'chat_reply'."
+
+#: twitch_bot.py:92
+#, python-format
+msgid "Fehler: API unter %(url)s nicht erreichbar."
+msgstr "Error: API at %(url)s not reachable."
+
+#: twitch_bot.py:103
+msgid "FEHLER"
+msgstr "ERROR"
+
+#: twitch_bot.py:103
+#, python-format
+msgid "Bot-Konfiguration in %(file)s unvollständig."
+msgstr "Bot configuration in %(file)s incomplete."
+
+#: twitch_bot.py:109
+#, python-format
+msgid "API-Endpunkt wird auf %(url)s erwartet."
+msgstr "API endpoint expected at %(url)s."
+
+#: twitch_bot.py:113
+#, python-format
+msgid "Keine Befehle in %(file)s gefunden. Bot hört nur zu."
+msgstr "No commands found in %(file)s. Bot is listening only."
+
+#: twitch_bot.py:123
+#, python-format
+msgid "Bot '%(bot_name)s' ist Kanal '#%(channel_name)s' beigetreten."
+msgstr "Bot '%(bot_name)s' has joined channel '#%(channel_name)s'."
+
+#: twitch_bot.py:179
+msgid "Verbindung verloren. Skript wird beendet."
+msgstr "Connection lost. Script terminating."
+
+#: twitch_bot.py:182
+msgid "Unerwarteter Fehler"
+msgstr "Unexpected error"
+
+#: token_manager.py:45
+#, fuzzy, python-format
+msgid "Tokens erfolgreich in %(file)s gespeichert."
+msgstr "Playlist successfully saved as '%(file)s'!"
+
+#: token_manager.py:48
+#, fuzzy, python-format
+msgid "FEHLER beim Speichern der Tokens: %(error)s"
+msgstr "Error saving schedule: %(error)s"
+
+#: token_manager.py:62
+msgid "Tausche Autorisierungscode gegen Tokens aus..."
+msgstr "Exchange authorization code for tokens..."
+
+#: token_manager.py:67
+msgid "Tokens erfolgreich von Twitch erhalten."
+msgstr "Tokens successfully received from Twitch."
+
+#: token_manager.py:71
+#, fuzzy, python-format
+msgid "FEHLER bei der Kommunikation mit der Twitch API: %(error)s"
+msgstr "Error deleting rotation: %(error)s"
+
+#: token_manager.py:73 token_manager.py:96
+#, python-format
+msgid "Antwort von Twitch: %(response)s"
+msgstr "Twitch response: %(response)s"
+
+#: token_manager.py:85
+msgid "Access-Token ist abgelaufen. Erneuere Token..."
+msgstr "Access token has expired. Renew token..."
+
+#: token_manager.py:90
+#, fuzzy
+msgid "Token erfolgreich erneuert."
+msgstr "Entry successfully duplicated."
+
+#: token_manager.py:94
+msgid "FEHLER: Konnte den Access-Token nicht erneuern."
+msgstr "ERROR: Could not renew the access token."
+
+#: token_manager.py:108
+#, python-format
+msgid "FEHLER: Konnte %(file)s nicht laden, um Token zu prüfen."
+msgstr "ERROR: Could not load %(file)s to check tokens."
+
+#: token_manager.py:119
+msgid "FEHLER: Unvollständige Token-Informationen in der Konfiguration."
+msgstr "ERROR: Incomplete token information in the configuration."
+
+#: token_manager.py:131
+msgid ""
+"KRITISCH: Token-Erneuerung fehlgeschlagen. Bitte verbinde die Anwendung "
+"im Web-UI erneut mit Twitch."
+msgstr "CRITICAL: Token renewal failed. Please reconnect the application to Twitch in the web UI."
+
+#: token_manager.py:134
+msgid "Access-Token ist noch gültig."
+msgstr "Access token is still valid."
+
+#: templates/index.html:105
+msgid "Stream Control Center"
+msgstr "Stream Control Center"
+
+#: templates/index.html:106
+msgid "Version:"
+msgstr "Version:"
+
+#: templates/index.html:108
+#, python-format
+msgid "Update verfügbar: %(version)s!"
+msgstr "Update available: %(version)s!"
+
+#: templates/index.html:111
+msgid "Stream-Control-Center Seite"
+msgstr "Stream Control Center Page"
+
+#: templates/index.html:113
+msgid "Anleitung"
+msgstr "Manual"
+
+#: templates/index.html:114
+msgid "Fehler melden"
+msgstr "Report Bug"
+
+#: templates/index.html:125
+msgid "Fehler"
+msgstr "Error"
+
+#: templates/index.html:127
+msgid "Status:"
+msgstr "Status:"
+
+#: templates/index.html:128
+msgid "Streamer:"
+msgstr "Streamer:"
+
+#: templates/index.html:128 templates/index.html:129
+msgid "Wird geladen..."
+msgstr "Loading..."
+
+#: templates/index.html:129
+msgid "Bot:"
+msgstr "Bot:"
+
+#: templates/index.html:132
+msgid "Aktuell läuft:"
+msgstr "Currently Playing:"
+
+#: templates/index.html:136
+msgid "Startet das nächste Video in der Playlist sofort."
+msgstr "Starts the next video in the playlist immediately."
+
+#: templates/index.html:136
+msgid "Nächster Titel"
+msgstr "Next Track"
+
+#: templates/index.html:139
+msgid "Startet die aktuell laufende Playlist sofort von vorne."
+msgstr "Restarts the currently running playlist immediately from the beginning."
+
+#: templates/index.html:139
+msgid "Playlist Neustart"
+msgstr "Playlist Restart"
+
+#: templates/index.html:149
+msgid "Playlist"
+msgstr "Playlist"
+
+#: templates/index.html:150
+msgid "Rotationen"
+msgstr "Rotations"
+
+#: templates/index.html:151
+msgid "Bibliothek"
+msgstr "Library"
+
+#: templates/index.html:152
+msgid "Sendeplan"
+msgstr "Schedule"
+
+#: templates/index.html:153
+msgid "Prozess-Steuerung"
+msgstr "Process Control"
+
+#: templates/index.html:154
+msgid "Streamer-Config"
+msgstr "Streamer Config"
+
+#: templates/index.html:155
+msgid "Manager-Config"
+msgstr "Manager Config"
+
+#: templates/index.html:156
+msgid "Bot"
+msgstr "Bot"
+
+#: templates/index.html:162
+msgid "Befehls-Verwaltung"
+msgstr "Command Management"
+
+#: templates/index.html:167
+msgid "Befehl"
+msgstr "Command"
+
+#: templates/index.html:168 templates/index.html:224
+msgid "Aktionstyp"
+msgstr "Action Type"
+
+#: templates/index.html:169
+msgid "Details"
+msgstr "Details"
+
+#: templates/index.html:170 templates/index.html:213
+msgid "Berechtigung"
+msgstr "Permission"
+
+#: templates/index.html:171
+msgid "Bot-Antwort"
+msgstr "Bot Response"
+
+#: templates/index.html:172
+msgid "Aktion"
+msgstr "Action"
+
+#: templates/index.html:181
+msgid "Befehl:"
+msgstr "Command:"
+
+#: templates/index.html:182
+msgid "Nachricht:"
+msgstr "Message:"
+
+#: templates/index.html:191
+#, python-format
+msgid "Befehl '%(command)s' wirklich löschen?"
+msgstr "Really delete command '%(command)s'?"
+
+#: templates/index.html:199
+msgid "Keine Befehle konfiguriert."
+msgstr "No commands configured."
+
+#: templates/index.html:205
+msgid "Neuen Befehl hinzufügen"
+msgstr "Add New Command"
+
+#: templates/index.html:209
+msgid "Befehl (z.B. !next)"
+msgstr "Command (e.g. !next)"
+
+#: templates/index.html:215
+msgid "Jeder"
+msgstr "Everyone"
+
+#: templates/index.html:216
+msgid "Moderatoren"
+msgstr "Moderators"
+
+#: templates/index.html:220
+msgid "Cooldown (Sekunden)"
+msgstr "Cooldown (seconds)"
+
+#: templates/index.html:226
+msgid "Stream steuern"
+msgstr "Control Stream"
+
+#: templates/index.html:227
+msgid "Chat-Antwort"
+msgstr "Chat Response"
+
+#: templates/index.html:232
+msgid "Befehl an Streamer"
+msgstr "Command to Streamer"
+
+#: templates/index.html:234
+msgid "Titel überspringen"
+msgstr "Skip Track"
+
+#: templates/index.html:235
+msgid "Playlist neustarten"
+msgstr "Restart Playlist"
+
+#: templates/index.html:240
+msgid "Nachricht für Chat-Antwort"
+msgstr "Message for Chat Response"
+
+#: templates/index.html:241
+#, python-brace-format
+msgid "Verwende {platzhalter}"
+msgstr "Use {placeholders}"
+
+#: templates/index.html:245
+msgid "Antwort des Bots nach Aktion (optional)"
+msgstr "Bot's response after action (optional)"
+
+#: templates/index.html:246
+#, python-brace-format
+msgid "@{user} wird durch den Namen des Nutzers ersetzt."
+msgstr "@{user} will be replaced with the user's name."
+
+#: templates/index.html:248
+msgid "Befehl hinzufügen"
+msgstr "Add Command"
+
+#: templates/index.html:250
+msgid "Bot Prozess-Steuerung"
+msgstr "Bot Process Control"
+
+#: templates/index.html:251
+msgid "Live Chat"
+msgstr "Live Chat"
+
+#: templates/index.html:256
+msgid "Bot-Prozess läuft"
+msgstr "Bot process is running"
+
+#: templates/index.html:259
+msgid "Bist du sicher, dass du den Bot-Prozess beenden möchtest?"
+msgstr "Are you sure you want to stop the bot process?"
+
+#: templates/index.html:261
+msgid "Bot Stoppen"
+msgstr "Stop Bot"
+
+#: templates/index.html:267
+msgid "Bot-Prozess ist offline"
+msgstr "Bot process is offline"
+
+#: templates/index.html:269
+msgid "Bot Starten"
+msgstr "Start Bot"
+
+#: templates/index.html:275
+msgid "Live-Log (`bot.log`)"
+msgstr "Live Log (`bot.log`)"
+
+#: templates/index.html:276 templates/index.html:910
+msgid "Log-Daten werden geladen..."
+msgstr "Log data loading..."
+
+#: templates/index.html:289
+msgid "Playlist-Editor:"
+msgstr "Playlist Editor:"
+
+#: templates/index.html:303
+msgid ""
+"Sicher, dass du die ausgewählte Playlist und die .csv-Datei permanent "
+"löschen möchtest?"
+msgstr ""
+"Are you sure you want to permanently delete the selected playlist and the"
+" .csv file?"
+
+#: templates/index.html:305
+msgid "Geladene Playlist löschen"
+msgstr "Delete Loaded Playlist"
+
+#: templates/index.html:311
+msgid "Gesamtdauer:"
+msgstr "Total Duration:"
+
+#: templates/index.html:313
+msgid "Sortieren nach:"
+msgstr "Sort by:"
+
+#: templates/index.html:315
+msgid "Dateiname"
+msgstr "Filename"
+
+#: templates/index.html:316 templates/index.html:374
+msgid "Titel"
+msgstr "Title"
+
+#: templates/index.html:317
+msgid "Spiel"
+msgstr "Game"
+
+#: templates/index.html:319
+msgid "Sortieren"
+msgstr "Sort"
+
+#: templates/index.html:321
+msgid "Alle aktivieren"
+msgstr "Activate All"
+
+#: templates/index.html:322
+msgid "Alle deaktivieren"
+msgstr "Deactivate All"
+
+#: templates/index.html:328
+msgid "Für den Stream aktiv:"
+msgstr "Active for Stream:"
+
+#: templates/index.html:330
+msgid "Keine"
+msgstr "None"
+
+#: templates/index.html:337
+#, python-format
+msgid "'%(name)s' aktivieren (Sanft)"
+msgstr "Activate '%(name)s' (Soft)"
+
+#: templates/index.html:340
+#, python-format
+msgid "'%(name)s' aktivieren (Sofort)"
+msgstr "Activate '%(name)s' (Immediate)"
+
+#: templates/index.html:346
+msgid "Playlist durchsuchen..."
+msgstr "Search playlist..."
+
+#: templates/index.html:354
+msgid "Ziehen zum Neuanordnen"
+msgstr "Drag to Reorder"
+
+#: templates/index.html:357
+msgid "Fehler beim Duplizieren."
+msgstr "Error duplicating."
+
+#: templates/index.html:359
+msgid "Diesen Eintrag duplizieren"
+msgstr "Duplicate this entry"
+
+#: templates/index.html:375
+msgid "Spiel / Kategorie"
+msgstr "Game / Category"
+
+#: templates/index.html:380
+msgid "Soll der Eintrag wirklich aus der Playlist entfernt werden?"
+msgstr "Should the entry really be removed from the playlist?"
+
+#: templates/index.html:381
+msgid "Fehler beim Entfernen."
+msgstr "Error removing."
+
+#: templates/index.html:383
+msgid "Nur diesen Playlist-Eintrag entfernen"
+msgstr "Remove only this playlist entry"
+
+#: templates/index.html:393
+msgid "Fehler beim Speichern:"
+msgstr "Error saving:"
+
+#: templates/index.html:394
+msgid "Ein Fehler ist aufgetreten. Prüfe die Konsole."
+msgstr "An error occurred. Check the console."
+
+#: templates/index.html:396
+msgid "Änderungen speichern"
+msgstr "Save Changes"
+
+#: templates/index.html:404
+msgid "Playlist-Rotationen"
+msgstr "Playlist Rotations"
+
+#: templates/index.html:405
+#, fuzzy
+msgid ""
+"Erstelle eine Abfolge von Playlists, die zu einer großen Master-Playlist "
+"zusammengefügt werden. Ziehe Playlists von links nach rechts, um sie zur "
+"Rotation hinzuzufügen."
+msgstr ""
+"Create a sequence of playlists that will be merged into a large master "
+"playlist. Drag playlists from left to right to add them to the rotation."
+
+#: templates/index.html:407
+msgid "Name der Rotation..."
+msgstr "Rotation name..."
+
+#: templates/index.html:409
+msgid "Bitte gib einen Namen für die Rotation ein."
+msgstr "Please enter a name for the rotation."
+
+#: templates/index.html:410
+msgid "Die Rotation ist leer. Bitte ziehe Playlists in den Ablauf."
+msgstr "The rotation is empty. Please drag playlists into the sequence."
+
+#: templates/index.html:412
+msgid "Speichern & Kompilieren"
+msgstr "Save & Compile"
+
+#: templates/index.html:417
+msgid "Verfügbare Playlists"
+msgstr "Available Playlists"
+
+#: templates/index.html:425
+msgid "Rotations-Ablauf"
+msgstr "Rotation Sequence"
+
+#: templates/index.html:434
+msgid "Gespeicherte Rotationen"
+msgstr "Saved Rotations"
+
+#: templates/index.html:437
+msgid "Noch keine Rotationen gespeichert."
+msgstr "No rotations saved yet."
+
+#: templates/index.html:441
+#, python-format
+msgid "%(count)s Playlists"
+msgstr "%(count)s Playlists"
+
+#: templates/index.html:443
+msgid "Bearbeiten"
+msgstr "Edit"
+
+#: templates/index.html:447
+#, python-format
+msgid ""
+"Bist du sicher, dass du die Rotation '%(name)s' permanent löschen "
+"möchtest?"
+msgstr "Are you sure you want to permanently delete the rotation '%(name)s'?"
+
+#: templates/index.html:449
+msgid "Löschen"
+msgstr "Delete"
+
+#: templates/index.html:460
+msgid "Globale Video-Bibliothek"
+msgstr "Global Video Library"
+
+#: templates/index.html:461
+msgid ""
+"Hier siehst du alle Videos, die in deinen konfigurierten Ordnern gefunden"
+" wurden."
+msgstr "Here you can see all videos found in your configured folders."
+
+#: templates/index.html:463
+msgid "Analyse- & Verwaltungs-Werkzeuge"
+msgstr "Analysis & Management Tools"
+
+#: templates/index.html:466
+msgid "Bibliothek synchronisieren"
+msgstr "Sync Library"
+
+#: templates/index.html:469
+msgid "Ungenutzte Videos finden"
+msgstr "Find Unused Videos"
+
+#: templates/index.html:472
+msgid "Neue Videos importieren"
+msgstr "Import New Videos"
+
+#: templates/index.html:475
+msgid "Fehlende Thumbnails generieren"
+msgstr "Generate Missing Thumbnails"
+
+#: templates/index.html:480
+msgid "Ergebnis der Analyse:"
+msgstr "Analysis Result:"
+
+#: templates/index.html:488
+msgid ""
+"Keine ungenutzten Videos gefunden. Alle Videodateien sind in mindestens "
+"einer Playlist enthalten."
+msgstr ""
+"No unused videos found. All video files are included in at least one "
+"playlist."
+
+#: templates/index.html:497
+msgid "Auswahl hinzufügen zu:"
+msgstr "Add selection to:"
+
+#: templates/index.html:505
+msgid "Hinzufügen"
+msgstr "Add"
+
+#: templates/index.html:508
+msgid "Neue Playlist aus Auswahl erstellen:"
+msgstr "Create new playlist from selection:"
+
+#: templates/index.html:509
+msgid "Name für neue Playlist..."
+msgstr "Name for new playlist..."
+
+#: templates/index.html:510
+msgid "Erstellen"
+msgstr "Create"
+
+#: templates/index.html:514
+msgid "Ausgewählte Dateien:"
+msgstr "Selected files:"
+
+#: templates/index.html:518
+msgid ""
+"WARNUNG:\n"
+"\n"
+"Die ausgewählten Videos werden permanent von der Festplatte gelöscht. "
+"Diese Aktion kann nicht rückgängig gemacht werden.\n"
+"\n"
+"Fortfahren?"
+msgstr ""
+"WARNING:\n"
+"\n"
+"The selected videos will be permanently deleted from the hard drive. This"
+" action cannot be undone.\n"
+"\n"
+"Continue?"
+
+#: templates/index.html:520
+msgid "Permanent Löschen"
+msgstr "Delete Permanently"
+
+#: templates/index.html:524
+msgid "Bibliothek durchsuchen..."
+msgstr "Search library..."
+
+#: templates/index.html:532
+msgid "Datei"
+msgstr "File"
+
+#: templates/index.html:533
+msgid "In Playlists"
+msgstr "In Playlists"
+
+#: templates/index.html:534
+msgid "Dauer"
+msgstr "Duration"
+
+#: templates/index.html:535
+#, fuzzy
+msgid "Größe"
+msgstr "Size"
+
+#: templates/index.html:536
+msgid "Pfad"
+msgstr "Path"
+
+#: templates/index.html:537
+msgid "Aktionen"
+msgstr "Actions"
+
+#: templates/index.html:557
+msgid "Bitte gib den neuen Dateinamen ein (ohne Endung):"
+msgstr "Please enter the new filename (without extension):"
+
+#: templates/index.html:559
+msgid "Video umbenennen"
+msgstr "Rename Video"
+
+#: templates/index.html:573
+msgid "Wöchentlicher Sendeplan"
+msgstr "Weekly Schedule"
+
+#: templates/index.html:574
+msgid ""
+"Leere Einträge werden ignoriert. Wenn für eine Zeit kein Event geplant "
+"ist, wird die \"Default Playlist\" aus der <code>schedule.json</code> "
+"verwendet."
+msgstr ""
+"Empty entries will be ignored. If no event is scheduled for a time, the "
+"\"Default Playlist\" from <code>schedule.json</code> will be used."
+
+#: templates/index.html:580
+msgid "Tag"
+msgstr "Day"
+
+#: templates/index.html:581
+msgid "Event 1"
+msgstr "Event 1"
+
+#: templates/index.html:582
+msgid "Event 2"
+msgstr "Event 2"
+
+#: templates/index.html:583
+msgid "Event 3"
+msgstr "Event 3"
+
+#: templates/index.html:595
+msgid "Keine Playlist"
+msgstr "No Playlist"
+
+#: templates/index.html:607
+msgid "bis"
+msgstr "to"
+
+#: templates/index.html:608
+msgid "x mal"
+msgstr "x times"
+
+#: templates/index.html:622
+msgid "Sendeplan speichern"
+msgstr "Save Schedule"
+
+#: templates/index.html:628
+msgid "Streamer Konfiguration (`config.json`)"
+msgstr "Streamer Configuration (`config.json`)"
+
+#: templates/index.html:629
+msgid "Ein Fehler beim Speichern ist aufgetreten. Bitte die Konsole prüfen."
+msgstr "An error occurred while saving. Please check the console."
+
+#: templates/index.html:634
+msgid "Twitch API"
+msgstr "Twitch API"
+
+#: templates/index.html:635
+msgid ""
+"Für die automatische Token-Erneuerung. Muss nur einmal eingerichtet "
+"werden."
+msgstr "For automatic token renewal. Only needs to be set up once."
+
+#: templates/index.html:636
+msgid "Mit Twitch verbinden"
+msgstr "Connect to Twitch"
+
+#: templates/index.html:637
+msgid "Client-ID:"
+msgstr "Client-ID:"
+
+#: templates/index.html:639
+msgid "Client Secret:"
+msgstr "Client Secret:"
+
+#: templates/index.html:640
+msgid "Wird zum Einrichten oder Ändern benötigt"
+msgstr "Required to set up or change"
+
+#: templates/index.html:641
+msgid "Kanalname:"
+msgstr "Channel name:"
+
+#: templates/index.html:646
+msgid "Stream"
+msgstr "Stream"
+
+#: templates/index.html:647
+msgid "Stream Key:"
+msgstr "Stream Key:"
+
+#: templates/index.html:648 templates/index.html:657
+msgid "Wird nicht angezeigt, kann aber überschrieben werden"
+msgstr "Not displayed, but can be overwritten"
+
+#: templates/index.html:649
+#, python-brace-format
+msgid "RTMP URL ({STREAM_KEY} wird ersetzt):"
+msgstr "RTMP URL ({STREAM_KEY} will be replaced):"
+
+#: templates/index.html:653
+msgid "Twitch Bot"
+msgstr "Twitch Bot"
+
+#: templates/index.html:654
+msgid "Bot-Account Name:"
+msgstr "Bot Account Name:"
+
+#: templates/index.html:656
+msgid "Bot-Account OAuth-Token:"
+msgstr "Bot Account OAuth Token:"
+
+#: templates/index.html:658
+msgid "Kanal, dem der Bot beitritt:"
+msgstr "Channel the bot joins:"
+
+#: templates/index.html:662
+msgid "Konfigurations-Presets"
+msgstr "Configuration Presets"
+
+#: templates/index.html:663
+msgid "Gespeichertes Preset laden / löschen:"
+msgstr "Load / delete saved preset:"
+
+#: templates/index.html:666
+msgid "Preset auswählen"
+msgstr "Select Preset"
+
+#: templates/index.html:672
+msgid "Bitte wähle ein Preset zum Laden aus."
+msgstr "Please select a preset to load."
+
+#: templates/index.html:673
+msgid "Preset erfolgreich geladen! Die Seite wird neu geladen."
+msgstr "Preset successfully loaded! The page will reload."
+
+#: templates/index.html:674
+msgid "Fehler beim Laden des Presets:"
+msgstr "Error loading preset:"
+
+#: templates/index.html:676
+msgid "Laden"
+msgstr "Load"
+
+#: templates/index.html:679
+msgid "Bitte wähle ein Preset zum Löschen aus."
+msgstr "Please select a preset to delete."
+
+#: templates/index.html:680
+#, python-format
+msgid "Bist du sicher, dass du das Preset \"%s\" permanent löschen möchtest?"
+msgstr "Are you sure you want to permanently delete the preset \"%s\"?"
+
+#: templates/index.html:681
+msgid "Preset erfolgreich gelöscht! Die Seite wird neu geladen."
+msgstr "Preset successfully deleted! The page will reload."
+
+#: templates/index.html:682
+msgid "Fehler beim Löschen des Presets:"
+msgstr "Error deleting preset:"
+
+#: templates/index.html:687
+msgid "Aktuelle Konfiguration als Preset speichern:"
+msgstr "Save current configuration as preset:"
+
+#: templates/index.html:689
+msgid "Name für das Preset..."
+msgstr "Name for the preset..."
+
+#: templates/index.html:691
+msgid "Bitte gib einen Namen für das Preset ein."
+msgstr "Please enter a name for the preset."
+
+#: templates/index.html:692
+msgid "Preset erfolgreich gespeichert! Die Seite wird neu geladen."
+msgstr "Preset successfully saved! The page will reload."
+
+#: templates/index.html:693
+msgid "Fehler beim Speichern des Presets:"
+msgstr "Error saving preset:"
+
+#: templates/index.html:695
+msgid "Speichern"
+msgstr "Save"
+
+#: templates/index.html:703
+msgid "Design (Overlay)"
+msgstr "Design (Overlay)"
+
+#: templates/index.html:704
+msgid "Schriftart für \"Now Playing\"-Text:"
+msgstr "Font for \"Now Playing\" text:"
+
+#: templates/index.html:706
+msgid "Overlay deaktiviert"
+msgstr "Overlay disabled"
+
+#: templates/index.html:713
+msgid "Schriftfarbe:"
+msgstr "Font color:"
+
+#: templates/index.html:717
+msgid "Box-Farbe:"
+msgstr "Box color:"
+
+#: templates/index.html:721
+msgid "Box-Transparenz:"
+msgstr "Box transparency:"
+
+#: templates/index.html:723
+msgid "Text-Position:"
+msgstr "Text position:"
+
+#: templates/index.html:725
+msgid "Unten Mitte"
+msgstr "Bottom Center"
+
+#: templates/index.html:726
+msgid "Oben Mitte"
+msgstr "Top Center"
+
+#: templates/index.html:728
+#, fuzzy
+msgid "Schriftgröße:"
+msgstr "Font size:"
+
+#: templates/index.html:731
+msgid "Schriftarten verwalten"
+msgstr "Manage Fonts"
+
+#: templates/index.html:738
+#, python-format
+msgid "Soll die Schriftart %(font)s wirklich gelöscht werden?"
+msgstr "Should the font %(font)s really be deleted?"
+
+#: templates/index.html:745
+msgid "Keine Schriftarten gefunden."
+msgstr "No fonts found."
+
+#: templates/index.html:749
+msgid "Neue Schriftart hochladen (.ttf, .otf):"
+msgstr "Upload new font (.ttf, .otf):"
+
+#: templates/index.html:752
+msgid "Hochladen"
+msgstr "Upload"
+
+#: templates/index.html:764
+msgid "Automatischer Neustart (Feste Uhrzeit)"
+msgstr "Automatic restart (fixed time)"
+
+#: templates/index.html:767
+msgid ""
+"Erzwingt jeden Tag zu dieser Uhrzeit einen Neustart. (z.B. 04:00). Leer "
+"lassen, um zu deaktivieren."
+msgstr "Forces a reboot every day at this time (e.g., 4:00 AM). Leave blank to disable."
+
+#: templates/index.html:770
+msgid "Automatischer Neustart (Stunden)"
+msgstr "Automatic restart (hours)"
+
+#: templates/index.html:774
+msgid ""
+"Erzwingt alle X Stunden einen Neustart des Streams (um 48h-Disconnects zu"
+" umgehen). 0 = Deaktiviert."
+msgstr "Forces a stream restart every X hours (to avoid 48-hour disconnects). 0 = Disabled."
+
+#: templates/index.html:776
+msgid "Stream-Modus:"
+msgstr "Stream Mode:"
+
+#: templates/index.html:779
+msgid "Transcoding (Flexibel, hohe CPU-Last)"
+msgstr "Transcoding (Flexible, high CPU load)"
+
+#: templates/index.html:783
+msgid "Remuxing / Copy (CPU-schonend, strenge Regeln)"
+msgstr "Remuxing / Copy (CPU-friendly, strict rules)"
+
+#: templates/index.html:786
+msgid "Achtung!"
+msgstr "Attention!"
+
+#: templates/index.html:786
+msgid ""
+"Im \"Remuxing\"-Modus müssen ALLE deine Videodateien exakt die gleichen "
+"Eigenschaften haben."
+msgstr ""
+"In \"Remuxing\" mode, ALL your video files must have exactly the same "
+"properties."
+
+#: templates/index.html:790
+msgid "Encoder (nur für Transcoding-Modus):"
+msgstr "Encoder (for transcoding mode only):"
+
+#: templates/index.html:792
+msgid "libx264 (CPU, hohe Qualität)"
+msgstr "libx264 (CPU, high quality)"
+
+#: templates/index.html:793
+msgid "h264_nvenc (NVIDIA GPU, schnell)"
+msgstr "h264_nvenc (NVIDIA GPU, fast)"
+
+#: templates/index.html:794
+msgid "h264_qsv (Intel Quick Sync, sehr schnell)"
+msgstr "h264_qsv (Intel Quick Sync, very fast)"
+
+#: templates/index.html:795
+msgid "h264_amf (AMD GPU, sehr schnell)"
+msgstr "h264_amf (AMD GPU, very fast)"
+
+#: templates/index.html:797
+msgid "Video Bitrate (z.B. 6000k):"
+msgstr "Video Bitrate (e.g. 6000k):"
+
+#: templates/index.html:799
+msgid "Audio Bitrate (z.B. 160k):"
+msgstr "Audio Bitrate (e.g. 160k):"
+
+#: templates/index.html:801
+msgid "Preset (für libx264 Encoder):"
+msgstr "Preset (for libx264 encoder):"
+
+#: templates/index.html:807
+msgid "Auflösung (z.B. 1920x1080):"
+msgstr "Resolution (e.g. 1920x1080):"
+
+#: templates/index.html:809
+msgid "Framerate (z.B. 60):"
+msgstr "Framerate (e.g. 60):"
+
+#: templates/index.html:818
+msgid "Speichern (ohne Neustart)"
+msgstr "Save (without restart)"
+
+#: templates/index.html:824
+msgid ""
+"Sichert die Einstellungen und startet den Stream nach dem aktuellen Video"
+" neu, damit sie wirksam werden. Sicher?"
+msgstr ""
+"Saves the settings and restarts the stream after the current video to "
+"apply them. Are you sure?"
+
+#: templates/index.html:826
+msgid "Speichern & Sanft Neustarten"
+msgstr "Save & Soft Restart"
+
+#: templates/index.html:829
+msgid ""
+"WARNUNG: Sichert die Einstellungen und startet den Stream sofort neu. "
+"Dies führt zu einer kurzen Unterbrechung. Sicher?"
+msgstr ""
+"WARNING: Saves the settings and restarts the stream immediately. This "
+"will cause a brief interruption. Are you sure?"
+
+#: templates/index.html:832
+msgid "Speichern & Sofort Neustarten"
+msgstr "Save & Restart Immediately"
+
+#: templates/index.html:840
+msgid "Manager Konfiguration (`manager_config.json`)"
+msgstr "Manager Configuration (`manager_config.json`)"
+
+#: templates/index.html:843
+msgid "Globale Einstellungen"
+msgstr "Global Settings"
+
+#: templates/index.html:846
+msgid "Sprache der Benutzeroberfläche:"
+msgstr "User interface language:"
+
+#: templates/index.html:848 templates/index.html:867
+msgid "Deutsch"
+msgstr "German"
+
+#: templates/index.html:849 templates/index.html:868
+msgid "English"
+msgstr "English"
+
+#: templates/index.html:855
+msgid "Titel-Prefix (für Twitch):"
+msgstr "Title prefix (for Twitch):"
+
+#: templates/index.html:859
+msgid "Overlay-Prefix (für \"Now Playing\"):"
+msgstr "Overlay prefix (for \"Now Playing\"):"
+
+#: templates/index.html:865
+msgid "Stream-Sprache:"
+msgstr "Stream language:"
+
+#: templates/index.html:872
+msgid "Video-Ordner (ein Pfad pro Zeile):"
+msgstr "Video folders (one path per line):"
+
+#: templates/index.html:876
+msgid "Thumbnail-Einstellungen"
+msgstr "Thumbnail Settings"
+
+#: templates/index.html:877
+msgid "Thumbnail Skalierung (FFmpeg-Format):"
+msgstr "Thumbnail scaling (FFmpeg format):"
+
+#: templates/index.html:879
+#, fuzzy
+msgid ""
+"Beispiele: `320:-1` (320px breit), `-1:180` (180px hoch), `320:180` "
+"(feste Größe)"
+msgstr ""
+"Examples: `320:-1` (320px wide), `-1:180` (180px high), `320:180` (fixed "
+"size)"
+
+#: templates/index.html:882
+msgid "Manager-Einstellungen speichern"
+msgstr "Save Manager Settings"
+
+#: templates/index.html:887
+msgid "Streamer Prozess-Steuerung"
+msgstr "Streamer Process Control"
+
+#: templates/index.html:891
+msgid "Streamer-Prozess läuft"
+msgstr "Streamer process is running"
+
+#: templates/index.html:894
+msgid "Bist du sicher, dass du den Streamer-Prozess beenden möchtest?"
+msgstr "Are you sure you want to stop the streamer process?"
+
+#: templates/index.html:896
+msgid "Streamer Stoppen"
+msgstr "Stop Streamer"
+
+#: templates/index.html:902
+msgid "Streamer-Prozess ist offline"
+msgstr "Streamer process is offline"
+
+#: templates/index.html:904
+msgid "Streamer Starten"
+msgstr "Start Streamer"
+
+#: templates/index.html:909
+msgid "Live-Log (`streamer.log`)"
+msgstr "Live Log (`streamer.log`)"
+
+#: templates/index.html:911
+msgid "FFmpeg Live-Log (`ffmpeg.log`)"
+msgstr "FFmpeg Live Log (`ffmpeg.log`)"
+
+#: templates/index.html:912
+msgid "FFmpeg-Log wird geladen..."
+msgstr "FFmpeg log loading..."
+
+#~ msgid "WARNUNG"
+#~ msgstr "WARNING"
+
+#~ msgid "Fehler bei der Spielsuche"
+#~ msgstr "Error during game search"
+
+#~ msgid "--- Sofort-Neustart-Signal verarbeitet ---"
+#~ msgstr "--- Immediate restart signal processed ---"
+
+#~ msgid "Unbekannt"
+#~ msgstr "Unknown"
+
+#~ msgid "OAuth Token:"
+#~ msgstr "OAuth Token:"
+

@@ -1,3 +1,4 @@
+from datetime import datetime
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -301,25 +302,34 @@ def main():
     ffmpeg_process = None
     soft_restart_is_pending = False # Der "Merkzettel" für den sanften Neustart
 
+    # --- Prozess-Startzeit schreiben (nur einmal beim Start) ---
+    try:
+        session_data = {}
+        try:
+            with open(session_file, 'r', encoding='utf-8') as f:
+                session_data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass # Neue Datei wird erstellt
+        
+        # Schreibe die Prozess-Startzeit (für Intervall-Logik)
+        session_data['process_start_time'] = datetime.now().isoformat()
+        with open(session_file, 'w', encoding='utf-8') as f:
+            json.dump(session_data, f, indent=2)
+        print(f"{Fore.GREEN}{_('Prozess-Startzeit in session.json vermerkt.')}")
+    except Exception as e:
+        print(f"{Fore.RED}{_('Fehler beim Schreiben der Prozess-Startzeit')}: {e}")
+    # --- ENDE ---
+
     while True:
         try:
-            # --- Signalverarbeitung mit Priorität ---
-            session_data = {}
-            try:
-                with open(session_file, 'r', encoding='utf-8') as f:
-                    session_data = json.load(f)
-            except (FileNotFoundError, json.JSONDecodeError):
-                pass 
-
-            if session_data.get('force_restart'):
-                session_data['force_restart'] = False
-                with open(session_file, 'w', encoding='utf-8') as f:
-                    json.dump(session_data, f, indent=2)
-                print(f"{Fore.GREEN}{_('--- Sofort-Neustart-Signal verarbeitet ---')}")
-            
-            # --- Setup-Phase ---
+            # --- Setup-Phase (Signal-Prüfung wurde in die innere Schleife verschoben) ---
             CONFIG = load_config()
             if not CONFIG: time.sleep(10); continue
+
+            try:
+                with open(session_file, 'r', encoding='utf-8') as f: session_data = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError): 
+                session_data = {}
 
             try:
                 with open('videos.json', 'r', encoding='utf-8') as f: videos_db = json.load(f)
@@ -438,10 +448,36 @@ def main():
                     with open(session_file, 'r', encoding='utf-8') as f: current_session = json.load(f)
                 except (FileNotFoundError, json.JSONDecodeError): pass
 
+                # --- KORRIGIERTER AUTO-RESTART BLOCK ---
                 if current_session.get('force_restart'):
                     print(f"{Fore.YELLOW}{_('--- SOFORT-Neustart-Signal erkannt. ---')}")
-                    if ffmpeg_process: ffmpeg_process.terminate(); ffmpeg_process.wait(timeout=5)
-                    break 
+                    if ffmpeg_process: 
+                        ffmpeg_process.terminate()
+                        ffmpeg_process.wait(timeout=5)
+                    
+                    # --- OFFLINE-WARTEZEIT ---
+                    print(f"{Fore.RED}{_('Erzwinge 2 Minuten Offline-Zeit, um 48h-Sitzung zurückzusetzen...')}")
+                    try:
+                        with open(status_file, 'w', encoding='utf-8') as f: 
+                            json.dump({"status": "Offline", "now_playing": _("Geplanter Neustart...")}, f)
+                    except Exception: pass
+                    time.sleep(120) # 2 Minuten warten
+                    
+                    # --- FLAG SICHER ZURÜCKSETZEN ---
+                    try:
+                        # Lade die session.json erneut, um keine Keys zu überschreiben
+                        with open(session_file, 'r', encoding='utf-8') as f:
+                            session_to_update = json.load(f)
+                        session_to_update['force_restart'] = False
+                        with open(session_file, 'w', encoding='utf-8') as f:
+                            json.dump(session_to_update, f, indent=2)
+                        print(f"{Fore.GREEN}{_('Neustart-Flag erfolgreich zurückgesetzt.')}")
+                    except Exception as e:
+                        print(f"{Fore.RED}{_('Fehler beim Zurücksetzen des Neustart-Flags')}: {e}")
+                    # --- ENDE ---
+                    
+                    break # Starte jetzt den Zyklus neu (bricht die innere Schleife)
+                # --- ENDE KORRIGIERTER BLOCK ---
 
                 if current_session.get('restart_pending'):
                     print(f"{Fore.CYAN}{_('--- SANFTER Neustart vorgemerkt. Warte auf nächstes Video. ---')}")

@@ -2,7 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0
+Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
+
+---
+## [0.6.0] - 2025-10-28
+
+### Hinzugefügt
+- **Automatischer Stream-Neustart:** Implementiert eine Funktion, um den Stream automatisch neu zu starten und so den 48-Stunden-Disconnect von Twitch zu umgehen.
+    - **Konfigurierbar:** Im "Streamer-Config"-Tab können Nutzer wählen zwischen einem Neustart nach einem festen Intervall (z.B. alle 24 Stunden) oder zu einer festen täglichen Uhrzeit (z.B. 04:00 Uhr). Beide Optionen können kombiniert werden.
+    - **Erzwungene Offline-Zeit:** Um sicherzustellen, dass Twitch die alte Sitzung beendet, legt der Streamer nach dem Signal eine Zwangspause von 2 Minuten ein, bevor der Stream neu gestartet wird.
+- **Live Twitch Spiel/Kategorie-Suche:** Im "Playlist"-Tab wurde eine Autovervollständigungsfunktion für das Feld "Spiel / Kategorie" hinzugefügt.
+    - Während der Eingabe wird die Twitch-API live abgefragt (`/helix/search/categories`).
+    - Eine Vorschlagsliste mit passenden, offiziellen Twitch-Kategorien wird unter dem Feld angezeigt, um Fehleingaben zu vermeiden und den "Just Chatting"-Fallback-Bug zu beheben.
+- **Lokalisierung:** Neue Texte für die Auto-Restart-Funktion und die Spielsuche wurden hinzugefügt und übersetzbar gemacht (DE/EN).
+
+### Behoben
+- **Rotationen (Metadaten-Verlust):** Ein kritischer Fehler wurde behoben, bei dem das Kompilieren einer Rotation die manuell gesetzten Titel und Spiele aus den Quell-Playlists mit Standardwerten überschrieben hat. Alle Metadaten (Titel, Spiel, Aktiv-Status) werden nun korrekt 1:1 in die Rotations-Playlist kopiert.
+- **UI (Playlist-Titel):** Ein Anzeigefehler im "Playlist"-Tab wurde behoben, bei dem lange Titel trotz vorhandenem Scrollbalken weiterhin mit "..." abgeschnitten wurden. Der volle Titel ist nun beim Hovern und Scrollen lesbar.
+- **UI (Log-Anzeige):** Probleme wurden behoben, die verhinderten, dass die Live-Logs (`streamer.log`, `ffmpeg.log`) im "Prozess-Steuerung"-Tab korrekt angezeigt wurden. Dies wurde durch korrektes Schließen von Datei-Handles im Manager und das Verhindern von Browser-Caching gelöst.
+- **Übersetzungssystem (`pybabel`):** Diverse Probleme mit `pybabel` (falsche Konfiguration, Encoding-Fehler, nicht aktualisierte `.po`-Dateien) wurden behoben. Die Extraktion und Aktualisierung der Sprachdateien funktioniert nun zuverlässig.
+- **Stabilität (`stream_v3.py`):** Ein `IndentationError` wurde behoben, der den Start des Streamers verhinderte. Die Logik zum Setzen/Zurücksetzen von Neustart-Signalen und Zeitstempeln in `session.json` wurde robuster gestaltet, um Konflikte zwischen `web_manager.py` und `stream_v3.py` zu vermeiden.
 
 ---
 ## [0.5.04] - 2025-10-18

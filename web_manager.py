@@ -20,6 +20,12 @@ import requests
 from flask_babel import Babel, _
 from flask import g
 from token_manager import exchange_code_for_token, save_tokens_to_config
+import threading
+from datetime import datetime, timedelta
+from colorama import Fore, init
+from token_manager import get_valid_token
+
+init(autoreset=True)
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -60,6 +66,103 @@ app.config['BABEL_TRANSLATION_DIRECTORIES'] = 'translations'
 
 # In-memory cache for API data
 api_cache = {'last_played': None, 'current_path': None}
+
+def auto_restart_monitor():
+    """Überwacht die Stream-Laufzeit und löst einen Neustart aus (Intervall ODER feste Zeit)."""
+    print(f"{Fore.CYAN}" + _("Auto-Restart Monitor Thread gestartet."))
+    
+    while True:
+        time.sleep(60) # Prüfe jede Minute
+        
+        try:
+            config = {}
+            session = {}
+            try:
+                with open(CONFIG_JSON, 'r', encoding='utf-8') as f: config = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                continue # Config fehlt, nächste Minute erneut versuchen
+            
+            try:
+                # Lade BEIDE Dateien für einen vollständigen Status
+                with open(STATUS_JSON, 'r', encoding='utf-8') as f_stat: 
+                    session = json.load(f_stat)
+                with open('session.json', 'r', encoding='utf-8') as f_sess: 
+                    session.update(json.load(f_sess))
+            except (FileNotFoundError, json.JSONDecodeError):
+                continue # Session-Dateien fehlen, nächste Minute erneut versuchen
+
+            # --- Lade alle Einstellungen ---
+            ffmpeg_config = config.get('ffmpeg', {})
+            interval_hours = ffmpeg_config.get('auto_restart_interval_hours', 0)
+            restart_time_str = ffmpeg_config.get('auto_restart_time', '') # z.B. "04:00"
+            
+            # Lese die korrekten Zeitstempel
+            proc_start_time_str = session.get('process_start_time') # Für Intervall
+            streamer_status = session.get('status', 'Offline')
+            
+            if streamer_status != 'Online':
+                continue # Nichts zu tun, wenn Stream offline ist
+                
+            if session.get('force_restart', False):
+                continue # Signal wird bereits verarbeitet
+
+            now = datetime.now()
+            trigger_restart = False
+            
+            # --- LOGIK 1: Intervall-Prüfung (nutzt process_start_time) ---
+            if interval_hours > 0 and proc_start_time_str:
+                start_time = datetime.fromisoformat(proc_start_time_str)
+                target_restart_time = start_time + timedelta(hours=interval_hours)
+                if now >= target_restart_time:
+                    print(f"{Fore.YELLOW}" + _("Auto-Restart (Intervall): Zeitlimit (%(hours)sh) erreicht.", hours=interval_hours))
+                    trigger_restart = True
+                    # WICHTIG: Setze die Prozess-Startzeit zurück, damit Intervall neu beginnt
+                    session['process_start_time'] = now.isoformat()
+
+            # --- LOGIK 2: Feste Uhrzeit-Prüfung ---
+            if not trigger_restart and restart_time_str:
+                current_time_str = now.strftime("%H:%M")
+                last_trigger_str = session.get('last_daily_restart_trigger')
+                last_trigger_date = None
+                if last_trigger_str:
+                    try:
+                        last_trigger_date = datetime.fromisoformat(last_trigger_str).date()
+                    except ValueError:
+                        pass # Ignoriere ungültiges Datum
+
+                if current_time_str == restart_time_str and now.date() != last_trigger_date:
+                    print(f"{Fore.YELLOW}" + _("Auto-Restart (Uhrzeit): Fester Zeitpunkt (%(time)s) erreicht.", time=restart_time_str))
+                    trigger_restart = True
+                    session['last_daily_restart_trigger'] = now.isoformat()
+
+            # --- Signal senden ---
+            if trigger_restart:
+                print(f"{Fore.YELLOW}" + _("Sende 'force_restart' Signal an Streamer..."))
+                
+                # Lade ALLE keys aus session.json, um nichts zu verlieren
+                full_session_data = {}
+                try:
+                    with open('session.json', 'r', encoding='utf-8') as f_sess:
+                        full_session_data = json.load(f_sess)
+                except (FileNotFoundError, json.JSONDecodeError):
+                    pass # wird überschrieben
+                
+                # Aktualisiere die Keys, die wir geändert haben
+                full_session_data['force_restart'] = True
+                if 'process_start_time' in session: # (falls Intervall ausgelöst hat)
+                    full_session_data['process_start_time'] = session['process_start_time']
+                if 'last_daily_restart_trigger' in session: # (falls Uhrzeit ausgelöst hat)
+                    full_session_data['last_daily_restart_trigger'] = session['last_daily_restart_trigger']
+                
+                with open('session.json', 'w', encoding='utf-8') as f_sess:
+                    json.dump(full_session_data, f_sess, indent=2)
+
+        except Exception as e:
+            print(f"{Fore.RED}" + _("Fehler im Auto-Restart-Thread: %(error)s", error=e))
+            import traceback
+            traceback.print_exc()
+            time.sleep(300) # Bei schwerem Fehler länger warten
+
 
 @app.route('/connect_twitch')
 def connect_twitch():
@@ -325,7 +428,7 @@ def create_playlist_from_selection():
             for video_id in video_ids_to_add:
                 video_info = videos_db.get(video_id)
                 if video_info:
-                    title, _ = os.path.splitext(video_info.get('basename', ''))
+                    title, _ext = os.path.splitext(video_info.get('basename', ''))
                     # KORREKTUR: Schreibe immer alle 4 Spalten
                     writer.writerow([video_id, title, 'Just Chatting', '1'])
 
@@ -380,7 +483,7 @@ def add_to_playlist():
             if video_id not in existing_video_ids:
                 video_info = videos_db.get(video_id)
                 if video_info:
-                    title, _ = os.path.splitext(video_info.get('basename', ''))
+                    title, _ext = os.path.splitext(video_info.get('basename', ''))
                     writer.writerow([video_id, title, 'Just Chatting', '1'])
                     added_count += 1
 
@@ -458,7 +561,7 @@ def rename_video():
         old_path = video_info['path']
         # Extrahiere den Ordnerpfad und die alte Dateiendung
         directory = os.path.dirname(old_path)
-        _, extension = os.path.splitext(old_path)
+        _basename, extension = os.path.splitext(old_path)
         
         # Bereinige den neuen Namen und füge die alte Endung wieder an
         new_basename = "".join(c for c in new_basename_without_ext if c.isalnum() or c in (' ', '.', '_', '-')).rstrip() + extension
@@ -550,7 +653,11 @@ def start_streamer():
         
         with open('streamer.pid', 'w') as f:
             f.write(str(process.pid))
-            
+        
+        script_log_file.close()
+        ffmpeg_log_file.close()
+        
+        
         flash(_("Streamer-Skript wurde erfolgreich gestartet!"), "success")
         time.sleep(2)
     except Exception as e:
@@ -796,6 +903,8 @@ def check_for_updates():
         return {"update_available": False, "current_version": local_version}
 
 
+# In V_5-05-web_manager.py
+
 @app.route('/save_rotation', methods=['POST'])
 def save_rotation():
     """Speichert eine Rotation in rotations.json UND kompiliert sie zu einer Master-Playlist."""
@@ -807,7 +916,7 @@ def save_rotation():
         return redirect(url_for('index', active_tab='rotations'))
 
     try:
-        # --- Teil 1: Rotation in rotations.json speichern (wie bisher) ---
+        # --- Teil 1: Rotation in rotations.json speichern ---
         playlist_ids = json.loads(playlist_ids_json)
         rotations_db = load_rotations_db()
         new_rotation_id = f"rot_{uuid.uuid4().hex[:8]}"
@@ -818,11 +927,11 @@ def save_rotation():
         with open('rotations.json', 'w', encoding='utf-8') as f:
             json.dump(rotations_db, f, indent=4)
 
-        # --- Teil 2: Rotation zu einer Master-Playlist kompilieren (NEU) ---
+        # --- Teil 2: Rotation zu einer Master-Playlist kompilieren (KORRIGIERT) ---
         playlists_db = load_playlists_db()
-        videos_db = load_videos_db()
+        # videos_db wird nicht mehr für Metadaten benötigt
 
-        master_video_ids = []
+        master_video_rows = [] # Speichert die kompletten Zeilen
         for playlist_id in playlist_ids:
             playlist_info = playlists_db.get(playlist_id)
             if playlist_info:
@@ -830,7 +939,9 @@ def save_rotation():
                 with open(playlist_path, 'r', encoding='utf-8', newline='') as f:
                     reader = csv.reader(f)
                     for row in reader:
-                        if row: master_video_ids.append(row[0].strip())
+                        # Füge die komplette Zeile (ID, Titel, Spiel, Status) hinzu
+                        if row: 
+                            master_video_rows.append(row)
 
         MASTER_PLAYLIST_NAME = f"_rotation_{rotation_name}".replace(' ', '_')
         MASTER_PLAYLIST_FILENAME = MASTER_PLAYLIST_NAME + ".csv"
@@ -838,16 +949,14 @@ def save_rotation():
 
         with open(master_playlist_path, 'w', encoding='utf-8', newline='') as f:
             writer = csv.writer(f)
-            for video_id in master_video_ids:
-                video_info = videos_db.get(video_id, {})
-                title, _ = os.path.splitext(video_info.get('basename', _('Unbekannt')))
-                writer.writerow([video_id, title, 'Just Chatting', '1'])
+            # Schreibe die gesammelten, vollständigen Zeilen
+            writer.writerows(master_video_rows)
 
         master_playlist_id = None
         for pl_id, pl_info in playlists_db.items():
             if pl_info['filename'] == MASTER_PLAYLIST_FILENAME:
                 master_playlist_id = pl_id
-                pl_info['name'] = MASTER_PLAYLIST_NAME
+                pl_info['name'] = MASTER_PLAYLIST_NAME # Update Name, falls schon vorhanden
                 break
 
         if not master_playlist_id:
@@ -863,7 +972,8 @@ def save_rotation():
         flash(_("Ein unerwarteter Fehler ist aufgetreten: %(error)s", error=e), "error")
         return redirect(url_for('index', active_tab='rotations'))
 
-    return redirect(url_for('index', active_tab='playlist'))
+    # Leite den Benutzer direkt zur neuen Playlist im Editor weiter
+    return redirect(url_for('index', active_tab='playlist', edit_playlist=master_playlist_id))
 
 @app.route('/delete_rotation', methods=['POST'])
 def delete_rotation():
@@ -1708,7 +1818,9 @@ def save_settings_js():
             "encoder": form_data.get('ffmpeg_encoder'), "stream_mode": form_data.get('ffmpeg_stream_mode'),
             "video_bitrate": form_data.get('ffmpeg_video_bitrate'), "audio_bitrate": form_data.get('ffmpeg_audio_bitrate'),
             "preset": form_data.get('ffmpeg_preset'), "resolution": form_data.get('ffmpeg_resolution'),
-            "framerate": form_data.get('ffmpeg_framerate')
+            "framerate": form_data.get('ffmpeg_framerate'),
+            "auto_restart_interval_hours": form_data.get('auto_restart_interval_hours', 24, type=int),
+            "auto_restart_time": form_data.get('auto_restart_time', '')
         })
         
         # --- NEU: Twitch Bot Konfiguration speichern ---
@@ -2010,7 +2122,56 @@ def delete_bot_command():
         flash(_("Fehler beim Löschen des Befehls: %(error)s", error=e), "error")
 
     return redirect(url_for('index', active_tab='bot'))  
-   
+
+# In V_5-05-web_manager.py
+
+@app.route('/api/search_game')
+def search_game():
+    """Sucht bei Twitch nach Spiel-Kategorien basierend auf einer Suchanfrage."""
+    query = request.args.get('query', '')
+    if len(query) < 2:
+        # Sende keine Anfrage für zu kurze Suchbegriffe
+        return jsonify([])
+
+    try:
+        with open(CONFIG_JSON, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return jsonify(error="Config not found"), 500
+
+    client_id = config.get('twitch_api', {}).get('client_id')
+    access_token = get_valid_token() # Holt einen gültigen Token
+
+    if not client_id or not access_token:
+        print(f"{Fore.RED}" + _("API-FEHLER: Twitch Client-ID oder Token für Spielsuche nicht verfügbar."))
+        return jsonify(error="Twitch auth not configured"), 500
+
+    headers = {
+        'Client-ID': client_id,
+        'Authorization': f'Bearer {access_token}'
+    }
+    params = {
+        'query': query,
+        'first': 10  # Wir holen maximal 10 Ergebnisse
+    }
+
+    try:
+        response = requests.get('https://api.twitch.tv/helix/search/categories', headers=headers, params=params, timeout=5)
+        response.raise_for_status() # Löst einen Fehler aus, wenn der API-Call fehlschlägt
+        
+        data = response.json()
+        
+        # Extrahiere nur die Namen der Spiele aus der Twitch-Antwort
+        game_names = [game['name'] for game in data.get('data', [])]
+        
+        return jsonify(game_names)
+
+    except requests.exceptions.RequestException as e:
+        print(f"{Fore.RED}" + _("Fehler bei der Twitch-Spielsuche: %(error)s", error=e))
+        return jsonify(error=str(e)), 503
+
+
+
 if __name__ == '__main__':
     try:
         with open(MANAGER_CONFIG_JSON, 'r', encoding='utf-8') as f:
@@ -2021,6 +2182,9 @@ if __name__ == '__main__':
     
     # Lese den Port aus der Konfig, mit 5000 als absolut letztem Fallback
     port = manager_cfg.get('port', 5000)
+    
+    auto_restart_thread = threading.Thread(target=auto_restart_monitor, daemon=True)
+    auto_restart_thread.start()
     
     print(f"Playlist Manager started! Open https://127.0.0.1:{port} in your browser.")
     # Füge ssl_context='adhoc' hinzu, um HTTPS zu aktivieren
