@@ -3,6 +3,13 @@
 Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
+## [0.6.1] - 2025-11-17
+
+### Behoben
+- **Kritischer Fehler (Neustart-Logik):** Ein Fehler wurde behoben, bei dem die 120-Sekunden-Offline-Pause (für den 48h-Reset) fälschlicherweise von allen "sofortigen" UI-Aktionen ausgelöst wurde (z.B. "Nächster Titel", "Playlist aktivieren (Sofort)"). Die Signale wurden in `scheduled_restart` (für den Timer, mit Pause) und `force_restart` (für die UI, sofort) getrennt.
+- **Kritischer Fehler (Auto-Restart Timer):** Ein Logikfehler im `auto_restart_monitor` wurde behoben, der verhinderte, dass der Neustart zu einer festen Uhrzeit (z.B. "17:31") zuverlässig ausgelöst wurde. Die Zeitprüfung wurde von einer exakten (`==`) auf eine relative (`>=`) Prüfung umgestellt und das Status-Handling korrigiert.
+- **Kritischer Fehler (Bot-Start):** Eine Reihe von Python-Fehlern (`SyntaxError`, `UnboundLocalError`, `TypeError`) in `twitch_bot.py` wurden behoben, die den Start des Bots komplett verhinderten. Der Bot ist nun wieder funktionsfähig.
+- **Kritischer Fehler (Streamer-Stabilität):** Ein Fehler wurde behoben, durch den der Streamer (`stream_v3.py`) abstürzte, wenn ein Videodateiname ein Apostroph (`'`) enthielt (z.B. `A Juggler's Tale.mp4`). Die Dateipfade werden nun beim Erstellen der `ffmpeg_playlist.txt` korrekt escaped.
 
 ---
 ## [0.6.0] - 2025-10-28

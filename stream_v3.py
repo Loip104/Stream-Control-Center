@@ -425,7 +425,9 @@ def main():
             with open(ffmpeg_playlist_file, 'w', encoding='utf-8') as f:
                 for video in playlist_for_ffmpeg:
                     clean_path = video['path'].strip().replace('\\', '/')
-                    f.write(f"file '{clean_path}'\n")
+                    # NEU: Apostrophe für den FFmpeg concat-Parser escapen (' wird zu '\'')
+                    clean_path_escaped = clean_path.replace("'", "'\\''")
+                    f.write(f"file '{clean_path_escaped}'\n")
                     
             if ffmpeg_process and ffmpeg_process.poll() is None: ffmpeg_process.terminate(); ffmpeg_process.wait()
             ffmpeg_process = run_stream(ffmpeg_playlist_file)
@@ -448,9 +450,10 @@ def main():
                     with open(session_file, 'r', encoding='utf-8') as f: current_session = json.load(f)
                 except (FileNotFoundError, json.JSONDecodeError): pass
 
-                # --- KORRIGIERTER AUTO-RESTART BLOCK ---
-                if current_session.get('force_restart'):
-                    print(f"{Fore.YELLOW}{_('--- SOFORT-Neustart-Signal erkannt. ---')}")
+                
+                # 1. PRÜFUNG: Geplanter 48h-Neustart (MIT 120s PAUSE)
+                if current_session.get('scheduled_restart'):
+                    print(f"{Fore.YELLOW}{_('--- GEPLANTER 48h-Neustart erkannt. ---')}")
                     if ffmpeg_process: 
                         ffmpeg_process.terminate()
                         ffmpeg_process.wait(timeout=5)
@@ -465,18 +468,36 @@ def main():
                     
                     # --- FLAG SICHER ZURÜCKSETZEN ---
                     try:
-                        # Lade die session.json erneut, um keine Keys zu überschreiben
                         with open(session_file, 'r', encoding='utf-8') as f:
                             session_to_update = json.load(f)
-                        session_to_update['force_restart'] = False
+                        session_to_update['scheduled_restart'] = False # Setzt das NEUE Flag zurück
                         with open(session_file, 'w', encoding='utf-8') as f:
                             json.dump(session_to_update, f, indent=2)
-                        print(f"{Fore.GREEN}{_('Neustart-Flag erfolgreich zurückgesetzt.')}")
+                        print(f"{Fore.GREEN}{_('Geplantes Neustart-Flag erfolgreich zurückgesetzt.')}")
                     except Exception as e:
-                        print(f"{Fore.RED}{_('Fehler beim Zurücksetzen des Neustart-Flags')}: {e}")
-                    # --- ENDE ---
+                        print(f"{Fore.RED}{_('Fehler beim Zurücksetzen des Geplanten Neustart-Flags')}: {e}")
                     
-                    break # Starte jetzt den Zyklus neu (bricht die innere Schleife)
+                    break # Starte den Zyklus neu
+
+                # 2. PRÜFUNG: Sofortiger Benutzer-Neustart (OHNE PAUSE)
+                if current_session.get('force_restart'):
+                    print(f"{Fore.YELLOW}{_('--- SOFORT-Neustart-Signal (Benutzer) erkannt. ---')}")
+                    if ffmpeg_process: 
+                        ffmpeg_process.terminate()
+                        ffmpeg_process.wait(timeout=5)
+                    
+                    # --- FLAG SICHER ZURÜCKSETZEN ---
+                    try:
+                        with open(session_file, 'r', encoding='utf-8') as f:
+                            session_to_update = json.load(f)
+                        session_to_update['force_restart'] = False # Setzt das ALTE Flag zurück
+                        with open(session_file, 'w', encoding='utf-8') as f:
+                            json.dump(session_to_update, f, indent=2)
+                        print(f"{Fore.GREEN}{_('Sofort-Neustart-Flag erfolgreich zurückgesetzt.')}")
+                    except Exception as e:
+                        print(f"{Fore.RED}{_('Fehler beim Zurücksetzen des Sofort-Neustart-Flags')}: {e}")
+
+                    break # Starte den Zyklus neu
                 # --- ENDE KORRIGIERTER BLOCK ---
 
                 if current_session.get('restart_pending'):

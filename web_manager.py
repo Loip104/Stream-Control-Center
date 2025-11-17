@@ -67,98 +67,116 @@ app.config['BABEL_TRANSLATION_DIRECTORIES'] = 'translations'
 # In-memory cache for API data
 api_cache = {'last_played': None, 'current_path': None}
 
+
 def auto_restart_monitor():
     """Überwacht die Stream-Laufzeit und löst einen Neustart aus (Intervall ODER feste Zeit)."""
+    # KORREKTE FORMATIERUNG
     print(f"{Fore.CYAN}" + _("Auto-Restart Monitor Thread gestartet."))
     
     while True:
-        time.sleep(60) # Prüfe jede Minute
+        time.sleep(60) 
         
         try:
             config = {}
-            session = {}
+            session_data = {} 
+
             try:
                 with open(CONFIG_JSON, 'r', encoding='utf-8') as f: config = json.load(f)
             except (FileNotFoundError, json.JSONDecodeError):
-                continue # Config fehlt, nächste Minute erneut versuchen
+                continue # Config fehlt
             
             try:
-                # Lade BEIDE Dateien für einen vollständigen Status
-                with open(STATUS_JSON, 'r', encoding='utf-8') as f_stat: 
-                    session = json.load(f_stat)
                 with open('session.json', 'r', encoding='utf-8') as f_sess: 
-                    session.update(json.load(f_sess))
+                    session_data = json.load(f_sess)
             except (FileNotFoundError, json.JSONDecodeError):
-                continue # Session-Dateien fehlen, nächste Minute erneut versuchen
+                pass # OK, wenn sie fehlt
+            
+            try:
+                with open(STATUS_JSON, 'r', encoding='utf-8') as f_stat: 
+                    session_data.update(json.load(f_stat))
+            except (FileNotFoundError, json.JSONDecodeError):
+                continue # Status-Datei fehlt (Streamer läuft nicht)
 
             # --- Lade alle Einstellungen ---
             ffmpeg_config = config.get('ffmpeg', {})
             interval_hours = ffmpeg_config.get('auto_restart_interval_hours', 0)
-            restart_time_str = ffmpeg_config.get('auto_restart_time', '') # z.B. "04:00"
+            restart_time_str = ffmpeg_config.get('auto_restart_time', '') # z.B. "17:31"
             
-            # Lese die korrekten Zeitstempel
-            proc_start_time_str = session.get('process_start_time') # Für Intervall
-            streamer_status = session.get('status', 'Offline')
+            streamer_status = session_data.get('status', 'Offline')
             
             if streamer_status != 'Online':
-                continue # Nichts zu tun, wenn Stream offline ist
+                continue # Nichts zu tun
                 
-            if session.get('force_restart', False):
+            if session_data.get('scheduled_restart', False) or session_data.get('force_restart', False):
                 continue # Signal wird bereits verarbeitet
 
             now = datetime.now()
             trigger_restart = False
             
             # --- LOGIK 1: Intervall-Prüfung (nutzt process_start_time) ---
+            proc_start_time_str = session_data.get('process_start_time')
             if interval_hours > 0 and proc_start_time_str:
                 start_time = datetime.fromisoformat(proc_start_time_str)
                 target_restart_time = start_time + timedelta(hours=interval_hours)
                 if now >= target_restart_time:
-                    print(f"{Fore.YELLOW}" + _("Auto-Restart (Intervall): Zeitlimit (%(hours)sh) erreicht.", hours=interval_hours))
+                    # KORREKTE FORMATIERUNG (Fehler von Zeile 124)
+                    print(f"{Fore.YELLOW}" + (_("Auto-Restart (Intervall): Zeitlimit (%(hours)sh) erreicht.") % {'hours': interval_hours}))
                     trigger_restart = True
-                    # WICHTIG: Setze die Prozess-Startzeit zurück, damit Intervall neu beginnt
-                    session['process_start_time'] = now.isoformat()
+                    session_data['process_start_time'] = now.isoformat()
 
-            # --- LOGIK 2: Feste Uhrzeit-Prüfung ---
-            if not trigger_restart and restart_time_str:
-                current_time_str = now.strftime("%H:%M")
-                last_trigger_str = session.get('last_daily_restart_trigger')
-                last_trigger_date = None
+            # --- LOGIK 2: Feste Uhrzeit-Prüfung (KORRIGIERT) ---
+            if not trigger_restart and restart_time_str: # z.B. "17:31"
+                
+                last_trigger_str = session_data.get('last_daily_restart_trigger') 
+                already_done_today = False
                 if last_trigger_str:
                     try:
                         last_trigger_date = datetime.fromisoformat(last_trigger_str).date()
+                        if last_trigger_date == now.date():
+                            already_done_today = True
                     except ValueError:
-                        pass # Ignoriere ungültiges Datum
+                        pass 
 
-                if current_time_str == restart_time_str and now.date() != last_trigger_date:
-                    print(f"{Fore.YELLOW}" + _("Auto-Restart (Uhrzeit): Fester Zeitpunkt (%(time)s) erreicht.", time=restart_time_str))
-                    trigger_restart = True
-                    session['last_daily_restart_trigger'] = now.isoformat()
+                if not already_done_today:
+                    try:
+                        target_time_parts = restart_time_str.split(':') # ["17", "31"]
+                        if len(target_time_parts) == 2:
+                            target_hour = int(target_time_parts[0])
+                            target_minute = int(target_time_parts[1])
+
+                            if now.hour > target_hour or (now.hour == target_hour and now.minute >= target_minute):
+                                # KORREKTE FORMATIERUNG
+                                print(f"{Fore.YELLOW}" + (_("Auto-Restart (Uhrzeit): Fester Zeitpunkt (%(time)s) erreicht.") % {'time': restart_time_str}))
+                                trigger_restart = True
+                                session_data['last_daily_restart_trigger'] = now.isoformat()
+                    except (ValueError, TypeError):
+                        print(f"{Fore.RED}Ungültiges Zeitformat in 'auto_restart_time': {restart_time_str}")
+
 
             # --- Signal senden ---
             if trigger_restart:
-                print(f"{Fore.YELLOW}" + _("Sende 'force_restart' Signal an Streamer..."))
+                # KORREKTE FORMATIERUNG
+                print(f"{Fore.YELLOW}" + _("Sende 'scheduled_restart' Signal an Streamer..."))
                 
-                # Lade ALLE keys aus session.json, um nichts zu verlieren
-                full_session_data = {}
+                session_to_save = {}
                 try:
                     with open('session.json', 'r', encoding='utf-8') as f_sess:
-                        full_session_data = json.load(f_sess)
+                        session_to_save = json.load(f_sess)
                 except (FileNotFoundError, json.JSONDecodeError):
-                    pass # wird überschrieben
+                    pass
                 
-                # Aktualisiere die Keys, die wir geändert haben
-                full_session_data['force_restart'] = True
-                if 'process_start_time' in session: # (falls Intervall ausgelöst hat)
-                    full_session_data['process_start_time'] = session['process_start_time']
-                if 'last_daily_restart_trigger' in session: # (falls Uhrzeit ausgelöst hat)
-                    full_session_data['last_daily_restart_trigger'] = session['last_daily_restart_trigger']
+                session_to_save['scheduled_restart'] = True
+                if 'process_start_time' in session_data:
+                    session_to_save['process_start_time'] = session_data['process_start_time']
+                if 'last_daily_restart_trigger' in session_data:
+                    session_to_save['last_daily_restart_trigger'] = session_data['last_daily_restart_trigger']
                 
                 with open('session.json', 'w', encoding='utf-8') as f_sess:
-                    json.dump(full_session_data, f_sess, indent=2)
+                    json.dump(session_to_save, f_sess, indent=2)
 
         except Exception as e:
-            print(f"{Fore.RED}" + _("Fehler im Auto-Restart-Thread: %(error)s", error=e))
+            # KORREKTE FORMATIERUNG
+            print(f"{Fore.RED}" + (_("Fehler im Auto-Restart-Thread: %(error)s") % {'error': e}))
             import traceback
             traceback.print_exc()
             time.sleep(300) # Bei schwerem Fehler länger warten
@@ -2143,7 +2161,7 @@ def search_game():
     access_token = get_valid_token() # Holt einen gültigen Token
 
     if not client_id or not access_token:
-        print(f"{Fore.RED}" + _("API-FEHLER: Twitch Client-ID oder Token für Spielsuche nicht verfügbar."))
+        print(f"{Fore.RED}API-FEHLER: Twitch Client-ID oder Token für Spielsuche nicht verfügbar.")
         return jsonify(error="Twitch auth not configured"), 500
 
     headers = {
@@ -2167,7 +2185,7 @@ def search_game():
         return jsonify(game_names)
 
     except requests.exceptions.RequestException as e:
-        print(f"{Fore.RED}" + _("Fehler bei der Twitch-Spielsuche: %(error)s", error=e))
+        print(f"{Fore.RED}Fehler bei der Twitch-Spielsuche: {e}")
         return jsonify(error=str(e)), 503
 
 
