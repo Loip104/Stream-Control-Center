@@ -3,13 +3,36 @@
 Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
-## [0.6.1] - 2025-11-17
 
-### Behoben
-- **Kritischer Fehler (Neustart-Logik):** Ein Fehler wurde behoben, bei dem die 120-Sekunden-Offline-Pause (für den 48h-Reset) fälschlicherweise von allen "sofortigen" UI-Aktionen ausgelöst wurde (z.B. "Nächster Titel", "Playlist aktivieren (Sofort)"). Die Signale wurden in `scheduled_restart` (für den Timer, mit Pause) und `force_restart` (für die UI, sofort) getrennt.
-- **Kritischer Fehler (Auto-Restart Timer):** Ein Logikfehler im `auto_restart_monitor` wurde behoben, der verhinderte, dass der Neustart zu einer festen Uhrzeit (z.B. "17:31") zuverlässig ausgelöst wurde. Die Zeitprüfung wurde von einer exakten (`==`) auf eine relative (`>=`) Prüfung umgestellt und das Status-Handling korrigiert.
-- **Kritischer Fehler (Bot-Start):** Eine Reihe von Python-Fehlern (`SyntaxError`, `UnboundLocalError`, `TypeError`) in `twitch_bot.py` wurden behoben, die den Start des Bots komplett verhinderten. Der Bot ist nun wieder funktionsfähig.
-- **Kritischer Fehler (Streamer-Stabilität):** Ein Fehler wurde behoben, durch den der Streamer (`stream_v3.py`) abstürzte, wenn ein Videodateiname ein Apostroph (`'`) enthielt (z.B. `A Juggler's Tale.mp4`). Die Dateipfade werden nun beim Erstellen der `ffmpeg_playlist.txt` korrekt escaped.
+---
+## [0.6.21] - 2026-05-03
+
+### Geändert
+- **Kick-Modul Update:**
+    - Beim OAuth-Login werden nun zusätzlich `slug` und `channel_id` des Nutzers abgerufen und gespeichert.
+    - Eine Fallback-Logik für das Stream-Metadaten-Update wurde implementiert. Sollte das generische Update (`PATCH /public/v1/channels`) fehlschlagen, versucht das Modul nun zielgerichtete Updates über die `channel_id` und den `slug` als Backup.
+- **YouTube-Modul Update:**
+    - Ein Bug beim Aktualisieren der Metadaten wurde behoben: Beim `PUT`-Request auf `/liveBroadcasts` werden nun die `contentDetails` mitgeschickt. Dies verhindert, dass YouTube serverseitig die wichtige Option `enableAutoStart` auf `False` zurücksetzt, wodurch der Stream nun zuverlässig automatisch live geht.
+    - Die Ausgaben des manuellen Transition-Threads wurden verfeinert, um klar zu differenzieren, ob der Stream durch den YouTube Auto-Start live ging oder ob das Skript als Fallback ("Safety-Net") manuell eingreifen musste.
+- **Web-Interface & Design:**
+    - **Tab-Navigation überarbeitet:** Das alte "Dateiordner"-Design der Tabs wurde durch ein modernes, abgerundetes "Pill"-Design ersetzt, das besser in die Mitte zentriert ist.
+    - **FontAwesome & Schriftart:** Die Tabs nutzen jetzt FontAwesome Icons zur besseren Erkennbarkeit. Die UI Schriftart wurde auf das moderne Google Font "Inter" gewechselt.
+    - **Playlist-Controls Fix:** Die Labels der Playlist-Buttons (Sanft/Sofort) wurden auf kurze, prägnante Bezeichnungen ("Sanft aktivieren" / "Sofort aktivieren") gekürzt. Der lange Playlist-Name wird nun aus Platzgründen per Tooltip angezeigt, wodurch das Responsive-Layout des Info-Banners nicht mehr zerrissen wird.
+- **System & Konfiguration:**
+    - **Update-Sicherheit:** Wenn `.json`-Konfigurationen manuell per Drag-and-Drop bei Updates überschrieben werden könnten, nutzt das System nun `.example.json`-Vorlagen. Dateien wie `config.json` oder `manager_config.json` werden beim Start automatisch aus ihren `.example`-Vorlagen erstellt, falls sie noch nicht existieren.
+    - **Erweiterte Templates:** `config.example.json` wurde um die Layout-Blöcke für YouTube und Kick erweitert, damit Neulinge alle Schnittstellen direkt konfigurieren können.
+    - **Telemetrie Version:** Der hartkodierte Payload-String in der `web_manager.py` für die Telemetrie-Schnittstelle wurde auf `Alpha-0-6-21` synchronisiert.
+    - **Lokalisierung:** Übersetzungsdateien (DE / EN) wurden um die neuen UI-Beschriftungen erweitert.
+
+---
+## [0.6.20] - 2026-05-02
+
+### Hinzugefügt
+- **Plattform-Modul-System eingeführt:** Das Projekt wurde um ein dynamisches, modulares System für Drittanbieter-Streaming-Plattformen erweitert. 
+    - Es ermöglicht die nahtlose Anbindung weiterer Dienste (wie Kick und YouTube) an den bestehenden Twitch-Kern, ohne den Hauptstreamer-Prozess (`stream_v3.py`) aufzublähen.
+    - **YouTube Modul:** Erlaubt das automatische Starten von geplanten Livestreams (Auto-Start Metadaten), aktualisiert Stream-Titel und Videobeschreibungen (inklusive Platzhalter wie `{title}` und `{game}`).
+    - **Kick Modul:** Bietet OAuth-Authentifizierung und synchronisiert automatisch den Stream-Titel sowie die gespielte Kategorie/Subkategorie mit der aktuellen Playlist.
+    - **Plattformen-Tab im UI:** Neues Interface zur übersichtlichen Konfiguration und Aktivierung/Deaktivierung der jeweiligen Drittanbieter-Module eingeführt.
 
 ---
 ## [0.6.0] - 2025-10-28

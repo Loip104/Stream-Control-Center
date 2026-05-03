@@ -24,6 +24,9 @@ import threading
 from datetime import datetime, timedelta
 from colorama import Fore, init
 from token_manager import get_valid_token
+import platform
+import ctypes
+import importlib.util
 
 init(autoreset=True)
 
@@ -44,6 +47,29 @@ STATUS_JSON = 'status.json'
 METADATA_CACHE_JSON = 'metadata_cache.json'
 VALID_EXTENSIONS = ('.mp4', '.mkv', '.mov', '.avi', '.flv')
 VALID_FONT_EXTENSIONS = ('.ttf', '.otf')
+
+def init_config_files():
+    """Prüft, ob die benötigten Konfigurationsdateien existieren. Falls nicht, werden sie aus den .example.json Dateien kopiert."""
+    files_to_check = {
+        'config.json': 'config.example.json',
+        'manager_config.json': 'manager_config.example.json',
+        'commands.json': 'commands.example.json',
+        'rotations.json': 'rotations.example.json',
+        'schedule.json': 'schedule.example.json'
+    }
+    
+    for target_file, example_file in files_to_check.items():
+        if not os.path.exists(target_file):
+            if os.path.exists(example_file):
+                try:
+                    shutil.copy2(example_file, target_file)
+                    print(Fore.GREEN + f"[*] {target_file} wurde aus {example_file} erstellt.")
+                except Exception as e:
+                    print(Fore.RED + f"[!] Fehler beim Erstellen von {target_file}: {e}")
+            else:
+                print(Fore.YELLOW + f"[!] Warnung: {example_file} nicht gefunden. {target_file} konnte nicht erstellt werden.")
+
+init_config_files()
 
 # --- App and i18n Initialization ---
 app = Flask(__name__)
@@ -66,6 +92,115 @@ app.config['BABEL_TRANSLATION_DIRECTORIES'] = 'translations'
 
 # In-memory cache for API data
 api_cache = {'last_played': None, 'current_path': None}
+
+loaded_modules = {}
+
+def load_modules(flask_app):
+    global loaded_modules
+    modules_dir = 'modules'
+    if not os.path.exists(modules_dir):
+        return
+    for filename in os.listdir(modules_dir):
+        if filename.endswith('_module.py'):
+            filepath = os.path.join(modules_dir, filename)
+            module_name = filename[:-3]
+            spec = importlib.util.spec_from_file_location(module_name, filepath)
+            mod = importlib.util.module_from_spec(spec)
+            try:
+                spec.loader.exec_module(mod)
+                if hasattr(mod, 'MODULE_ID'):
+                    loaded_modules[mod.MODULE_ID] = mod
+                    print(Fore.CYAN + _("Modul geladen: %(name)s") % {'name': mod.MODULE_NAME})
+                    if hasattr(mod, 'register_routes'):
+                        mod.register_routes(flask_app, flash, CONFIG_JSON)
+            except Exception as e:
+                print(Fore.RED + f"Fehler beim Laden von Modul {filename}: {e}")
+
+load_modules(app)
+
+def telemetry_monitor():
+    """Überwacht den Streamer-Status und sendet Telemetrie-Pings (Heartbeats), wenn aktiviert."""
+    print(f"{Fore.CYAN}" + _("Telemetrie Monitor Thread gestartet."))
+    
+    API_URL = "https://api.streamcontrol.center/v1/telemetry" # Vorläufige Endpunkt-URL
+    
+    # Warte kurz, damit der Manager komplett starten kann
+    time.sleep(10)
+    
+    while True:
+        try:
+            # 1. Telemetrie-Opt-In prüfen
+            manager_config = {}
+            try:
+                with open('manager_config.json', 'r', encoding='utf-8') as f:
+                    manager_config = json.load(f)
+            except:
+                pass
+                
+            telemetry_settings = manager_config.get('telemetry', {})
+            if not telemetry_settings.get('enabled', False):
+                time.sleep(60) # Opt-In ist aus, schlafe weiter
+                continue
+                
+            # 2. Ist der Stream live?
+            session_data = {}
+            try:
+                with open('session.json', 'r', encoding='utf-8') as f:
+                    session_data = json.load(f)
+            except:
+                pass
+                
+            try:
+                with open('status.json', 'r', encoding='utf-8') as f:
+                    session_data.update(json.load(f))
+            except:
+                pass
+                
+            status = session_data.get('status', 'Offline')
+            
+            # 3. Payload zusammenbauen
+            payload = {
+                "instance_id": manager_config.get('instance_id'),
+                "version": "Alpha-0-6-21",
+                "status": status,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Falls noch keine Instanz-ID existiert, generieren und speichern wir eine
+            if not payload["instance_id"]:
+                payload["instance_id"] = str(uuid.uuid4())
+                manager_config['instance_id'] = payload["instance_id"]
+                try:
+                    with open('manager_config.json', 'w', encoding='utf-8') as f:
+                        json.dump(manager_config, f, indent=4)
+                except:
+                    pass
+            
+            # Wenn der User seinen Kanal mitsenden will
+            if telemetry_settings.get('share_channel', False):
+                config = {}
+                try:
+                    with open('config.json', 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                except:
+                    pass
+                twitch_bot_cfg = config.get('twitch_bot', {})
+                channel_nick = twitch_bot_cfg.get('channel_nick', '')
+                if channel_nick:
+                    payload["twitch_channel"] = channel_nick
+                    
+            # 4. Senden des Heartbeats
+            try:
+                # Wir fangen Fehler ab, damit der Thread nicht stirbt, falls die API offline ist
+                requests.post(API_URL, json=payload, timeout=5)
+            except Exception:
+                pass # API nicht erreichbar oder URL falsch, ignorieren wir lautlos
+                
+        except Exception as e:
+            pass # Fehler im Thread ignorieren
+            
+        # Sende Heartbeat alle 5 Minuten
+        time.sleep(300)
 
 
 def auto_restart_monitor():
@@ -182,9 +317,10 @@ def auto_restart_monitor():
             time.sleep(300) # Bei schwerem Fehler länger warten
 
 
-@app.route('/connect_twitch')
-def connect_twitch():
-    """Leitet den Benutzer zur Twitch-Autorisierungsseite weiter."""
+
+@app.route('/connect_bot')
+def connect_bot():
+    """Leitet den Benutzer zur Twitch-Autorisierungsseite für den BOT."""
     try:
         with open(CONFIG_JSON, 'r', encoding='utf-8') as f:
             config = json.load(f)
@@ -192,25 +328,26 @@ def connect_twitch():
             manager_config = json.load(f)
 
         client_id = config.get('twitch_api', {}).get('client_id')
-        port = manager_config.get('port', 5000) # Port aus der manager_config lesen
+        port = manager_config.get('port', 5000)
 
         if not client_id:
+            # HIER IST DER NEUE TEXT, DEN PYBABEL FINDEN WIRD
             flash(_("Fehler: Zuerst muss eine Client-ID in der Streamer-Config gespeichert werden."), "error")
             return redirect(url_for('index', active_tab='settings'))
     except (FileNotFoundError, json.JSONDecodeError):
         flash(_("Fehler: Konnte Konfigurationsdateien nicht laden."), "error")
         return redirect(url_for('index', active_tab='settings'))
 
-    # URL dynamisch zusammenbauen
-    redirect_uri = f"https://127.0.0.1:{port}/twitch/callback"
-    scopes = 'channel:manage:broadcast'
+    redirect_uri = f"https://127.0.0.1:{port}/twitch/bot_callback" # NEUE CALLBACK URL
+    scopes = 'chat:read chat:edit' # NEUE BERECHTIGUNGEN
 
     auth_url = (f'https://id.twitch.tv/oauth2/authorize?response_type=code&client_id={client_id}&redirect_uri={redirect_uri}&scope={scopes}')
     return redirect(auth_url)
 
-@app.route('/twitch/callback')
-def twitch_callback():
-    """Verarbeitet die Rückkehr von der Twitch-Autorisierung."""
+
+@app.route('/twitch/bot_callback')
+def twitch_bot_callback():
+    """Verarbeitet die Rückkehr von der Twitch-Autorisierung für den BOT."""
     code = request.args.get('code')
     if not code:
         flash(_("Autorisierung fehlgeschlagen oder vom Benutzer abgelehnt."), "error")
@@ -227,28 +364,43 @@ def twitch_callback():
         port = manager_config.get('port', 5000)
 
         if not client_id or not client_secret:
-            flash(_("Fehler: Client-ID und Client Secret müssen zuerst in der Config gespeichert werden."), "error")
+            # HIER IST DER NEUE TEXT
+            flash(_("Fehler: Client-ID und Client Secret für Bot-Token-Generierung nicht in der Config gefunden."), "error")
             return redirect(url_for('index', active_tab='settings'))
 
     except (FileNotFoundError, json.JSONDecodeError):
         flash(_("Fehler: Konnte Konfigurationsdateien nicht laden."), "error")
         return redirect(url_for('index', active_tab='settings'))
 
-    # URL dynamisch zusammenbauen
-    redirect_uri = f"https://127.0.0.1:{port}/twitch/callback"
+    redirect_uri = f"https://127.0.0.1:{port}/twitch/bot_callback" 
 
-    # URL an die Funktion übergeben
     token_data = exchange_code_for_token(code, client_id, client_secret, redirect_uri)
 
     if token_data and 'access_token' in token_data:
-        if save_tokens_to_config(token_data):
-            flash(_("Erfolgreich mit Twitch verbunden! Die Tokens wurden gespeichert."), "success")
-        else:
-            flash(_("Fehler beim Speichern der Tokens."), "error")
+        try:
+            if 'twitch_bot' not in config:
+                config['twitch_bot'] = {}
+            
+            # Speichere die Tokens im BOT-Abschnitt
+            config['twitch_bot']['bot_token'] = token_data['access_token']
+            config['twitch_bot']['bot_refresh_token'] = token_data['refresh_token']
+            config['twitch_bot']['bot_expires_at'] = int(time.time()) + token_data['expires_in']
+
+            with open(CONFIG_JSON, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2)
+            
+            # HIER IST DER NEUE TEXT
+            flash(_("Bot-Token erfolgreich generiert und gespeichert!"), "success")
+        except Exception as e:
+            print(f"Fehler beim Speichern des Bot-Tokens in config.json: {e}")
+            # HIER IST DER NEUE TEXT
+            flash(_("Fehler beim Speichern des Bot-Tokens."), "error")
     else:
-        flash(_("Fehler: Konnte die Tokens nicht von Twitch erhalten. Überprüfe die Konsolenausgabe."), "error")
+        # HIER IST DER NEUE TEXT
+        flash(_("Fehler: Konnte die Bot-Tokens nicht von Twitch erhalten. Überprüfe die Konsolenausgabe."), "error")
 
     return redirect(url_for('index', active_tab='settings'))
+
 
 
 
@@ -637,13 +789,9 @@ def is_streamer_running():
     except (FileNotFoundError, ValueError):
         return False
 
-@app.route('/start_streamer', methods=['POST'])
-def start_streamer():
-    """Startet das stream_v3.py Skript und trennt dessen Logs von den FFmpeg-Logs."""
-    if is_streamer_running():
-        flash(_("Der Streamer-Prozess läuft bereits!"), "warning")
-        return redirect(url_for('index', active_tab='process'))
-
+def start_streamer_process():
+    """Hilfsfunktion zum Starten des Streamers ohne Web-Kontext."""
+    if is_streamer_running(): return False
     print("Starte Streamer-Skript (stream_v3.py) mit getrennten Logs...")
     try:
         python_executable = sys.executable
@@ -659,8 +807,6 @@ def start_streamer():
         ffmpeg_log_file = open('ffmpeg.log', 'w', encoding='utf-8')
 
         # Starte den Prozess und leite stdout und stderr getrennt um
-        # stdout (print-Befehle aus Python) -> streamer.log
-        # stderr (technische Ausgaben von FFmpeg) -> ffmpeg.log
         process = subprocess.Popen(
             [PYTHON_EXE, '-u', 'stream_v3.py'],
             creationflags=creation_flags,
@@ -674,12 +820,24 @@ def start_streamer():
         
         script_log_file.close()
         ffmpeg_log_file.close()
-        
-        
+        return True
+    except Exception as e:
+        print(f"Fehler beim Starten des Streamer-Skripts: {e}")
+        return False
+
+@app.route('/start_streamer', methods=['POST'])
+def start_streamer():
+    """Startet das stream_v3.py Skript und trennt dessen Logs von den FFmpeg-Logs."""
+    if is_streamer_running():
+        flash(_("Der Streamer-Prozess läuft bereits!"), "warning")
+        return redirect(url_for('index', active_tab='process'))
+
+    if start_streamer_process():
         flash(_("Streamer-Skript wurde erfolgreich gestartet!"), "success")
         time.sleep(2)
-    except Exception as e:
-        flash(_("Fehler beim Starten des Streamer-Skripts: %(error)s", error=e), "error")
+    else:
+        # Fallback Fehlerausgabe
+        flash(_("Fehler beim Starten des Streamer-Skripts. Siehe Konsole für Details."), "error")
         
     return redirect(url_for('index', active_tab='process'))
 
@@ -739,6 +897,29 @@ def stop_streamer():
     return redirect(url_for('index', active_tab='process'))
 
 from flask import session # Stelle sicher, dass 'session' am Anfang der Datei importiert wird
+
+@app.route('/save_telemetry_settings', methods=['POST'])
+def save_telemetry_settings():
+    try:
+        with open(MANAGER_CONFIG_JSON, 'r', encoding='utf-8') as f:
+            manager_config = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        manager_config = {}
+
+    if 'telemetry' not in manager_config:
+        manager_config['telemetry'] = {}
+
+    manager_config['telemetry']['enabled'] = request.form.get('telemetry_enabled') == 'true'
+    manager_config['telemetry']['share_channel'] = request.form.get('telemetry_share_channel') == 'true'
+
+    try:
+        with open(MANAGER_CONFIG_JSON, 'w', encoding='utf-8') as f:
+            json.dump(manager_config, f, indent=4)
+        flash(_("Telemetrie-Einstellungen erfolgreich gespeichert!"), "success")
+    except Exception as e:
+        flash(_("Fehler beim Speichern der Telemetrie-Einstellungen: %(error)s", error=e), "error")
+
+    return redirect(url_for('index', active_tab='community'))
 
 @app.route('/delete_files_from_library', methods=['POST'])
 def delete_files_from_library():
@@ -1178,6 +1359,7 @@ def index():
     os.makedirs(FONTS_DIR, exist_ok=True)
     available_fonts = [f for f in os.listdir(FONTS_DIR) if f.lower().endswith(VALID_FONT_EXTENSIONS)]
     
+    from flask import render_template_string
     # --- SEITE RENDERN ---
     return render_template('index.html',
                            videos=playlist_videos, all_disk_videos=all_disk_videos,
@@ -1189,7 +1371,8 @@ def index():
                            active_playlist_info=active_playlist_info, rotations_db=rotations_db,
                            rotation_to_edit=rotation_to_edit, rotation_name_to_edit=rotation_name_to_edit,
                            bot_commands=bot_commands, schedule=schedule_data,update_info=update_info,
-                           config_presets=config_presets,client_secret_exists=client_secret_exists)
+                           config_presets=config_presets,client_secret_exists=client_secret_exists,
+                           loaded_modules=loaded_modules, render_template_string=render_template_string)
     
 @app.route('/status')
 def get_status():
@@ -1203,6 +1386,17 @@ def get_status():
     bot_status_raw = "Online" if is_bot_running() else "Offline"
     raw_data['bot_status'] = bot_status_raw
     
+    # NEU: Aktive Playlist-Info hinzufügen
+    active_playlist_id = None
+    try:
+        with open(MANAGER_CONFIG_JSON, 'r', encoding='utf-8') as f:
+            manager_config = json.load(f)
+            active_playlist_id = manager_config.get('active_playlist_id')
+    except Exception: pass
+    
+    playlists_db = load_playlists_db()
+    active_playlist_info = playlists_db.get(active_playlist_id)
+
     # Erstelle das übersetzte JSON, das an den Browser gesendet wird
     translated_data = {
         # Füge die rohen, englischen Werte für die JS-Logik hinzu
@@ -1215,6 +1409,7 @@ def get_status():
         
         # Behalte alle anderen Daten (now_playing, etc.) bei
         "now_playing": raw_data.get('now_playing'),
+        "active_playlist": active_playlist_info.get('name') if active_playlist_info else _('Keine'),
         "title": raw_data.get('title'),
         "game": raw_data.get('game'),
         "video_duration": raw_data.get('video_duration'),
@@ -1236,12 +1431,9 @@ def get_log_content():
         pass 
     return jsonify({'log_content': log_content})
 
-@app.route('/start_bot', methods=['POST'])
-def start_bot():
-    if is_bot_running():
-        flash(_("Der Bot-Prozess läuft bereits!"), "warning")
-        return redirect(url_for('index', active_tab='bot'))
-
+def start_bot_process():
+    """Hilfsfunktion zum Starten des Bots ohne Web-Kontext."""
+    if is_bot_running(): return False
     print(_("Starte Bot-Skript (twitch_bot.py)..."))
     try:
         python_executable = sys.executable
@@ -1264,10 +1456,22 @@ def start_bot():
         with open('bot.pid', 'w') as f:
             f.write(str(process.pid))
             
+        return True
+    except Exception as e:
+        print(f"Fehler beim Starten des Bots: {e}")
+        return False
+
+@app.route('/start_bot', methods=['POST'])
+def start_bot():
+    if is_bot_running():
+        flash(_("Der Bot-Prozess läuft bereits!"), "warning")
+        return redirect(url_for('index', active_tab='bot'))
+
+    if start_bot_process():
         flash(_("Bot-Skript wurde erfolgreich gestartet!"), "success")
         time.sleep(2)
-    except Exception as e:
-        flash(_("Fehler beim Starten des Bot-Skripts: %(error)s", error=e), "error")
+    else:
+        flash(_("Fehler beim Starten des Bot-Skripts. Siehe Konsole für Details."), "error")
         
     return redirect(url_for('index', active_tab='bot'))
 
@@ -1468,15 +1672,41 @@ def bulk_disable():
 @app.route('/save_and_restart_deferred', methods=['POST'])
 def save_and_restart_deferred():
     """Speichert die Playlist und signalisiert einen verzögerten Neustart mit der korrekten ID."""
-    save_metadata() # Ruft die bereits korrigierte Speicherfunktion auf
+    # Wir müssen die Daten aus dem Formular/JSON extrahieren, falls vorhanden, 
+    # aber diese Route wird meist via Button-Klick ohne JSON-Body aufgerufen, 
+    # wenn die Playlist bereits im Browser-State ist. 
+    # Für die Persistenz ist es wichtig, dass die ID korrekt gesetzt wird.
+    
     try:
         with open(MANAGER_CONFIG_JSON, 'r', encoding='utf-8') as f: config = json.load(f)
+        editing_playlist_id = request.form.get('editing_playlist_id') or config.get('editing_playlist_id')
+        
+        # NEU: Auch die Metadaten speichern, falls welche im Formular gesendet wurden
+        # (Dies ist wichtig für die Abwärtskompatibilität mit dem klassischen Form-Submit)
+        if editing_playlist_id:
+            # Falls normale Formular-Daten vorhanden sind (title, game, video_id)
+            filenames = request.form.getlist('video_id')
+            if filenames:
+                titles = request.form.getlist('title')
+                games = request.form.getlist('game')
+                playlist_data = []
+                for i in range(len(filenames)):
+                    status = '1' if f'active_videos_{i}' in request.form or f'status_{i}' in request.form else '0' # Check both variants
+                    playlist_data.append({'id': filenames[i], 'title': titles[i], 'game': games[i], 'active': status == '1'})
+                internal_save_metadata(editing_playlist_id, playlist_data)
+
         session_data = {}
         try:
             with open('session.json', 'r', encoding='utf-8') as f: session_data = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError): pass
         
-        session_data['active_playlist_id'] = config.get('active_playlist_id') # ID HINZUGEFÜGT
+        # Mache die bearbeitete Playlist zur aktiven
+        if editing_playlist_id:
+            config['active_playlist_id'] = editing_playlist_id
+            with open(MANAGER_CONFIG_JSON, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2)
+            session_data['active_playlist_id'] = editing_playlist_id
+            
         session_data['restart_pending'] = True
         
         with open('session.json', 'w', encoding='utf-8') as f: json.dump(session_data, f, indent=2)
@@ -1608,11 +1838,31 @@ def delete_playlist():
 
 
 # NEUE, ROBUSTERE VERSION
+def internal_save_metadata(playlist_id, playlist_data):
+    """Interne Hilfsfunktion zum Speichern der Playlist-CSV."""
+    playlists_db = load_playlists_db()
+    playlist_info = playlists_db.get(playlist_id)
+    if not playlist_info:
+        raise ValueError(f"Playlist {playlist_id} nicht gefunden.")
+
+    playlist_path = os.path.join('playlists', playlist_info['filename'])
+    updated_rows = []
+    for item in playlist_data:
+        video_id = item.get('id')
+        title = item.get('title')
+        game = item.get('game')
+        status = '1' if item.get('active', False) else '0'
+        updated_rows.append([video_id, title, game, status])
+
+    with open(playlist_path, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerows(updated_rows)
+    return playlist_info
+
 @app.route('/save_metadata', methods=['POST'])
 def save_metadata():
     """Speichert Metadaten für die aktuell bearbeitete Playlist via JSON."""
     try:
-        # 1. Empfange die JSON-Daten vom Frontend
         data = request.get_json()
         editing_playlist_id = data.get('editing_playlist_id')
         playlist_data = data.get('playlist_data', [])
@@ -1620,47 +1870,46 @@ def save_metadata():
         if not editing_playlist_id:
             return jsonify(success=False, error=_("Keine zu bearbeitende Playlist-ID übermittelt.")), 400
 
-        playlists_db = load_playlists_db()
-        playlist_to_save_info = playlists_db.get(editing_playlist_id)
-        if not playlist_to_save_info:
-            return jsonify(success=False, error=_("Playlist mit ID '%(id)s' nicht gefunden.", id=editing_playlist_id)), 404
-
-        playlist_path = os.path.join('playlists', playlist_to_save_info['filename'])
-
-        # 2. Bereite die neuen Zeilen für die CSV-Datei vor
-        updated_rows = []
-        for item in playlist_data:
-            video_id = item.get('id')
-            title = item.get('title')
-            game = item.get('game')
-            # Konvertiere den Boolean-Wert (true/false) in '1' oder '0'
-            status = '1' if item.get('active', False) else '0'
-            updated_rows.append([video_id, title, game, status])
-
-        # 3. Schreibe die CSV-Datei komplett neu
-        with open(playlist_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerows(updated_rows)
+        playlist_info = internal_save_metadata(editing_playlist_id, playlist_data)
         
-        flash(_("Änderungen in Playlist '%(name)s' erfolgreich gespeichert!", name=playlist_to_save_info['name']), "success")
+        flash(_("Änderungen in Playlist '%(name)s' erfolgreich gespeichert!", name=playlist_info['name']), "success")
         return jsonify(success=True)
 
     except Exception as e:
-        # Gib eine generische, übersetzbare Fehlermeldung zurück anstatt des technischen Fehlers
+        print(f"Fehler in save_metadata: {e}")
         return jsonify(success=False, error=_("Ein unerwarteter Fehler ist aufgetreten.")), 500
 
 @app.route('/save_playlist_and_restart', methods=['POST'])
 def save_playlist_and_restart():
     """Speichert die Playlist und signalisiert einen sofortigen Neustart mit der korrekten ID."""
-    save_metadata() # Ruft die bereits korrigierte Speicherfunktion auf
     try:
         with open(MANAGER_CONFIG_JSON, 'r', encoding='utf-8') as f: config = json.load(f)
+        editing_playlist_id = request.form.get('editing_playlist_id') or config.get('editing_playlist_id')
+
+        # NEU: Metadaten speichern
+        if editing_playlist_id:
+            filenames = request.form.getlist('video_id')
+            if filenames:
+                titles = request.form.getlist('title')
+                games = request.form.getlist('game')
+                playlist_data = []
+                for i in range(len(filenames)):
+                    status = '1' if f'active_videos_{i}' in request.form or f'status_{i}' in request.form else '0'
+                    playlist_data.append({'id': filenames[i], 'title': titles[i], 'game': games[i], 'active': status == '1'})
+                internal_save_metadata(editing_playlist_id, playlist_data)
+
         session_data = {}
         try:
             with open('session.json', 'r', encoding='utf-8') as f: session_data = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError): pass
         
-        session_data['active_playlist_id'] = config.get('active_playlist_id') # ID HINZUGEFÜGT
+        # Mache die bearbeitete Playlist zur aktiven
+        if editing_playlist_id:
+            config['active_playlist_id'] = editing_playlist_id
+            with open(MANAGER_CONFIG_JSON, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2)
+            session_data['active_playlist_id'] = editing_playlist_id
+
         session_data['force_restart'] = True
         
         with open('session.json', 'w', encoding='utf-8') as f: json.dump(session_data, f, indent=2)
@@ -1679,7 +1928,6 @@ def save_manager_config():
     except (FileNotFoundError, json.JSONDecodeError):
         pass
     
-    # Lese die Pfade aus der Textarea und konvertiere sie in eine saubere Liste
     video_dirs_text = request.form.get('video_directories', '')
     video_dirs_list = [line.strip() for line in video_dirs_text.splitlines() if line.strip()]
 
@@ -1687,8 +1935,13 @@ def save_manager_config():
         'title_prefix': request.form.get('title_prefix'),
         'overlay_prefix': request.form.get('overlay_prefix'),
         'language': request.form.get('language'),
-        'thumbnail_scale': request.form.get('thumbnail_scale'),
-        'video_directories': video_dirs_list # NEU: Speichere als Liste
+        'language_stream': request.form.get('language_stream'), # WIEDER HINZUGEFÜGT
+        'thumbnail_scale': request.form.get('thumbnail_scale'), # WIEDER HINZUGEFÜGT
+        'video_directories': video_dirs_list,
+        'port': request.form.get('port', 5000, type=int),
+        'console_title': request.form.get('console_title', ''),
+        'autostart_streamer': request.form.get('autostart_streamer') == 'on',
+        'autostart_bot': request.form.get('autostart_bot') == 'on'
     })
     
     try:
@@ -1815,13 +2068,43 @@ def save_settings_js():
             config = {"twitch_api": {}, "stream_settings": {}, "ffmpeg": {}, "twitch_bot": {}}
 
         # --- KORREKTE, DETAILIERTE AKTUALISIERUNG ---
-        config['twitch_api'].update({
-            "client_id": form_data.get('twitch_client_id'),
-            "channel_name": form_data.get('twitch_channel_name')
-        })
-        # Speichere das Secret nur, wenn ein neues eingegeben wurde
-        if form_data.get('twitch_client_secret'):
-            config['twitch_api']['client_secret'] = form_data.get('twitch_client_secret')
+        
+        # Speichere dynamisch alle Felder, die mit module_{mod_id}_ beginnen
+        if 'modules' not in config: config['modules'] = {}
+        for mod_id, mod in loaded_modules.items():
+            if mod_id not in config['modules']: config['modules'][mod_id] = {}
+            
+            # Alle Formular-Felder für dieses Modul finden
+            prefix = f'module_{mod_id}_'
+            for key, value in form_data.items():
+                if key.startswith(prefix):
+                    field_name = key[len(prefix):]
+                    if field_name == 'enabled':
+                        config['modules'][mod_id]['enabled'] = (value == 'on')
+                    elif field_name == 'client_secret' or field_name == 'app_secret' or field_name == 'access_token':
+                        # Passwort-Felder nur speichern, wenn sie nicht leer sind (Placeholder-Logik)
+                        if value.strip():
+                            config['modules'][mod_id][field_name] = value
+                    else:
+                        config['modules'][mod_id][field_name] = value
+            
+            # Checkbox 'enabled' explizit prüfen (da sie bei 'off' nicht im POST ist)
+            config['modules'][mod_id]['enabled'] = form_data.get(f'module_{mod_id}_enabled') == 'on'
+
+            # Optional: Modul-spezifischer Hook nach dem Speichern
+            if hasattr(mod, 'on_settings_saved'):
+                try:
+                    mod.on_settings_saved(config)
+                except Exception as e:
+                    print(f"Fehler im on_settings_saved Hook von {mod_id}: {e}")
+        
+        # Behalte Fallbacks für veraltete Logik, falls diese noch direkt lesen
+        if 'twitch_api' not in config: config['twitch_api'] = {}
+        if config['modules'].get('twitch'):
+            config['twitch_api'].update({
+                'client_id': config['modules']['twitch'].get('client_id'),
+                'client_secret': config['modules']['twitch'].get('client_secret')
+            })
         
         config['stream_settings'].update({
             "rtmp_url": form_data.get('rtmp_url')
@@ -2157,11 +2440,24 @@ def search_game():
     except (FileNotFoundError, json.JSONDecodeError):
         return jsonify(error="Config not found"), 500
 
-    client_id = config.get('twitch_api', {}).get('client_id')
-    access_token = get_valid_token() # Holt einen gültigen Token
+    # --- KORRIGIERTER TEIL START ---
+    api_config = config.get('twitch_api', {})
+    client_id = api_config.get('client_id')
+    client_secret = api_config.get('client_secret')
+
+    # Wir müssen die Token-Daten sammeln, um sie an get_valid_token zu übergeben
+    token_data = {
+        'access_token': api_config.get('access_token'),
+        'refresh_token': api_config.get('refresh_token'),
+        'expires_at': api_config.get('expires_at')
+    }
+
+    # Jetzt rufen wir die Funktion mit den erforderlichen Argumenten auf
+    access_token = get_valid_token(token_data, client_id, client_secret, 'twitch_api')
+    # --- KORRIGIERTER TEIL ENDE ---
 
     if not client_id or not access_token:
-        print(f"{Fore.RED}API-FEHLER: Twitch Client-ID oder Token für Spielsuche nicht verfügbar.")
+        print(f"{Fore.RED}" + _("API-FEHLER: Twitch Client-ID oder Token für Spielsuche nicht verfügbar."))
         return jsonify(error="Twitch auth not configured"), 500
 
     headers = {
@@ -2175,7 +2471,7 @@ def search_game():
 
     try:
         response = requests.get('https://api.twitch.tv/helix/search/categories', headers=headers, params=params, timeout=5)
-        response.raise_for_status() # Löst einen Fehler aus, wenn der API-Call fehlschlägt
+        response.raise_for_status() 
         
         data = response.json()
         
@@ -2185,7 +2481,7 @@ def search_game():
         return jsonify(game_names)
 
     except requests.exceptions.RequestException as e:
-        print(f"{Fore.RED}Fehler bei der Twitch-Spielsuche: {e}")
+        print(f"{Fore.RED}" + _("Fehler bei der Twitch-Spielsuche: %(error)s", error=e))
         return jsonify(error=str(e)), 503
 
 
@@ -2195,15 +2491,63 @@ if __name__ == '__main__':
         with open(MANAGER_CONFIG_JSON, 'r', encoding='utf-8') as f:
             manager_cfg = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        # Wenn die Datei nicht existiert, setze Standardwerte
-        manager_cfg = {'port': 5000}
+        manager_cfg = {} # Leeres Diktat, Fallbacks werden unten behandelt
     
-    # Lese den Port aus der Konfig, mit 5000 als absolut letztem Fallback
+    # Lese Port und Titel aus der Config (mit Fallbacks)
     port = manager_cfg.get('port', 5000)
-    
+    console_title = manager_cfg.get('console_title') # Kann None oder "" sein
+
+    # --- KONSOLEN-TITEL SETZEN (ToDo #1) ---
+    try:
+        if platform.system() == "Windows":
+            # Fallback-Logik: Wenn kein Titel gesetzt ist, nimm den Port
+            if not console_title:
+                title = f"Stream Control Center - Port {port}"
+            else:
+                title = console_title
+            
+            ctypes.windll.kernel32.SetConsoleTitleW(title)
+            # Pybabel-konforme Print-Anweisung:
+            print(_("Konsolen-Titel auf '%(title)s' gesetzt.") % {'title': title})
+    except Exception as e:
+        # Pybabel-konforme Print-Anweisung:
+        print(_("Warnung: Konsolen-Titel konnte nicht gesetzt werden: %(error)s") % {'error': e})
+    # --- ENDE KONSOLEN-TITEL ---
+
+    # Stelle sicher, dass die Standard-Dateien existieren (falls nicht bereits vorhanden)
+    if not os.path.exists('playlists.json'):
+        with open('playlists.json', 'w', encoding='utf-8') as f: json.dump({}, f)
+    if not os.path.exists('session.json'):
+        with open('session.json', 'w', encoding='utf-8') as f: json.dump({"status": "Offline"}, f)
+    if not os.path.exists('videos.json'):
+        with open('videos.json', 'w', encoding='utf-8') as f: json.dump({}, f)
+
+    # Starte den Auto-Restart-Thread
     auto_restart_thread = threading.Thread(target=auto_restart_monitor, daemon=True)
     auto_restart_thread.start()
     
-    print(f"Playlist Manager started! Open https://127.0.0.1:{port} in your browser.")
-    # Füge ssl_context='adhoc' hinzu, um HTTPS zu aktivieren
-    app.run(host='127.0.0.1', port=port, debug=True, ssl_context='adhoc')
+    # Starte den Telemetrie-Thread
+    telemetry_thread = threading.Thread(target=telemetry_monitor, daemon=True)
+    telemetry_thread.start()
+    
+    # NEU: Auto-Start-Feature beim Hochfahren des Managers ausführen
+    if manager_cfg.get('autostart_streamer', False):
+        print(_("Auto-Start: Streamer wird automatisch gestartet..."))
+        start_streamer_process()
+        
+    if manager_cfg.get('autostart_bot', False):
+        print(_("Auto-Start: Bot wird automatisch gestartet..."))
+        start_bot_process()
+    
+    # Pybabel-konforme Print-Anweisung:
+    print((_("Playlist Manager gestartet! Öffne https://127.0.0.1:%(port)s in deinem Browser.") % {'port': port}))
+# Starte die Flask App
+    try:
+        app.run(host='0.0.0.0', port=port, debug=True, ssl_context='adhoc')
+    except OSError as e:
+        if "Address already in use" in str(e):
+            print(f"{Fore.RED}FATALER FEHLER: Port {port} ist bereits belegt. Läuft der Manager schon?")
+            time.sleep(10)
+        else:
+            print(f"{Fore.RED}FATALER FEHLER: {e}")
+            time.sleep(10)

@@ -13,7 +13,29 @@ import threading
 from colorama import Fore, init
 import gettext
 import json
+import shutil
 from token_manager import get_valid_token
+
+def init_config_files():
+    """Prüft, ob die benötigten Konfigurationsdateien existieren. Falls nicht, werden sie aus den .example.json Dateien kopiert."""
+    files_to_check = {
+        'config.json': 'config.example.json',
+        'manager_config.json': 'manager_config.example.json',
+        'commands.json': 'commands.example.json',
+        'rotations.json': 'rotations.example.json',
+        'schedule.json': 'schedule.example.json'
+    }
+    
+    for target_file, example_file in files_to_check.items():
+        if not os.path.exists(target_file):
+            if os.path.exists(example_file):
+                try:
+                    shutil.copy2(example_file, target_file)
+                    print(Fore.GREEN + f"[*] {target_file} wurde aus {example_file} erstellt.")
+                except Exception as e:
+                    print(Fore.RED + f"[!] Fehler beim Erstellen von {target_file}: {e}")
+
+init_config_files()
 
 try:
     # Lese die Sprache aus der zentralen Konfigurationsdatei
@@ -36,12 +58,40 @@ FFPROBE_EXE = os.path.join(BASE_DIR, 'ffmpeg', 'bin', 'ffprobe.exe')
 # Colorama initialisieren
 init(autoreset=True)
 
+import importlib.util
 # Globale Variablen
-BROADCASTER_ID = None
 CONFIG = None
+loaded_modules = {}
 
+def load_modules():
+    global loaded_modules
+    modules_dir = 'modules'
+    if not os.path.exists(modules_dir): return
+    for filename in os.listdir(modules_dir):
+        if filename.endswith('_module.py'):
+            filepath = os.path.join(modules_dir, filename)
+            module_name = filename[:-3]
+            spec = importlib.util.spec_from_file_location(module_name, filepath)
+            mod = importlib.util.module_from_spec(spec)
+            try:
+                spec.loader.exec_module(mod)
+                if hasattr(mod, 'MODULE_ID'):
+                    loaded_modules[mod.MODULE_ID] = mod
+                    print(Fore.CYAN + _("Modul für Metadaten geladen: %(name)s") % {'name': mod.MODULE_NAME})
+            except Exception as e:
+                print(Fore.RED + f"Fehler beim Laden des Moduls {filename}: {e}")
 
-
+def update_all_platforms(title, game_name, language):
+    global CONFIG
+    # NEU: Lade die Konfiguration vor jedem Update frisch, damit Änderungen im SCC sofort greifen
+    CONFIG = load_config()
+    
+    for mod_id, mod in loaded_modules.items():
+        if hasattr(mod, 'update_stream_info'):
+            try:
+                mod.update_stream_info(CONFIG, title, game_name, language, _)
+            except Exception as e:
+                print(Fore.RED + f"Fehler in {mod_id}.update_stream_info: {e}")
 
 # --- Helper Functions  ---
 def load_config():
@@ -57,93 +107,6 @@ def get_video_duration(video_path):
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True, creationflags=creation_flags)
         return float(result.stdout)
     except Exception: return 0.0
-
-# ERSETZE DIESE BEIDEN FUNKTIONEN IN stream_v3.py
-
-def get_twitch_user_id(username):
-    """Holt die Twitch User ID mit einem gültigen Token."""
-    if not CONFIG: return None
-    
-    valid_token = get_valid_token() # Holt einen frischen Token
-    if not valid_token:
-        print(Fore.RED + _("FEHLER: Konnte keinen gültigen Token für die User-ID-Abfrage erhalten."))
-        return None
-
-    headers = {
-        'Client-ID': CONFIG['twitch_api']['client_id'], 
-        'Authorization': f"Bearer {valid_token}"
-    }
-    params = {'login': username}
-    
-    try:
-        response = requests.get('https://api.twitch.tv/helix/users', headers=headers, params=params)
-        response.raise_for_status()
-        data = response.json()
-        if data.get('data'):
-            print(_("Twitch User-ID für '%(user)s' erfolgreich abgerufen.") % {'user': username})
-            return data['data'][0]['id']
-        else:
-            print(Fore.RED + _("FEHLER: Twitch User '%(user)s' nicht gefunden.") % {'user': username})
-            return None
-    except requests.exceptions.RequestException as e:
-        print(Fore.RED + _("Fehler beim Abrufen der User-ID: %(error)s") % {'error': e})
-        return None
-
-def get_game_id(game_name):
-    """Holt die Twitch Game ID mit einem gültigen Token."""
-    if not CONFIG: return None
-
-    valid_token = get_valid_token() # Holt einen frischen Token
-    if not valid_token:
-        print(Fore.RED + _("FEHLER: Konnte keinen gültigen Token für die Game-ID-Abfrage erhalten."))
-        return None
-
-    headers = {
-        'Client-ID': CONFIG['twitch_api']['client_id'], 
-        'Authorization': f"Bearer {valid_token}"
-    }
-    params = {'name': game_name}
-    
-    try:
-        response = requests.get('https://api.twitch.tv/helix/games', headers=headers, params=params)
-        response.raise_for_status()
-        data = response.json()
-        if data.get('data'):
-            return data['data'][0]['id']
-        else:
-            print(Fore.YELLOW + _("WARNUNG: Spiel '%(game)s' wurde auf Twitch nicht gefunden.") % {'game': game_name})
-            return None
-    except requests.exceptions.RequestException as e:
-        print(Fore.RED + _("Fehler bei der Spielsuche: %(error)s") % {'error': e})
-        return None
-
-def update_stream_info(title, game_name, language):
-    if not BROADCASTER_ID: return
-
-    # HOLT EINEN GARANTIERT GÜLTIGEN TOKEN
-    valid_token = get_valid_token()
-    if not valid_token:
-        print(Fore.RED + _("FEHLER: Konnte keinen gültigen Twitch-Token erhalten. Metadaten werden nicht aktualisiert."))
-        return
-
-    print(_("Aktualisiere Twitch-Metadaten -> Titel: %(title)s | Spiel: %(game)s") % {'title': title, 'game': game_name})
-
-    # VERWENDET DEN NEUEN, GÜLTIGEN TOKEN
-    headers = {
-        'Client-ID': CONFIG['twitch_api']['client_id'], 
-        'Authorization': f"Bearer {valid_token}",
-        'Content-Type': 'application/json'
-    }
-
-    body = {'title': title, 'broadcaster_language': language}
-    game_id = get_game_id(game_name) # This function also needs a valid token, which we now have.
-    if game_id: body['game_id'] = game_id
-
-    try:
-        url = f'https://api.twitch.tv/helix/channels?broadcaster_id={BROADCASTER_ID}'
-        requests.patch(url, headers=headers, json=body, timeout=10).raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(Fore.RED + _("Fehler beim Aktualisieren der Stream-Info: %(error)s") % {'error': e})
 
 def run_stream(ffmpeg_playlist_path):
     creation_flags = 0
@@ -296,9 +259,9 @@ def ffmpeg_clock_reader(process, shared_state):
                 pass
 
 def main():
-    global BROADCASTER_ID, CONFIG
+    global CONFIG
     status_file, session_file = 'status.json', 'session.json'
-    print(_("Streamer V6.5 (Echter Sanfter Neustart) gestartet."))
+    print(_("Streamer V0.6.21 (Echter Sanfter Neustart) gestartet."))
     ffmpeg_process = None
     soft_restart_is_pending = False # Der "Merkzettel" für den sanften Neustart
 
@@ -319,6 +282,8 @@ def main():
     except Exception as e:
         print(f"{Fore.RED}{_('Fehler beim Schreiben der Prozess-Startzeit')}: {e}")
     # --- ENDE ---
+    
+    load_modules()
 
     while True:
         try:
@@ -337,7 +302,7 @@ def main():
             except (FileNotFoundError, json.JSONDecodeError):
                 print(f"{Fore.RED}{_('FEHLER: videos.json oder playlists.json nicht gefunden.')}"); time.sleep(30); continue
 
-            if not BROADCASTER_ID: BROADCASTER_ID = get_twitch_user_id(CONFIG['twitch_api']['channel_name'])
+            active_playlist_id = session_data.get('active_playlist_id')
 
             active_playlist_id = session_data.get('active_playlist_id')
             active_playlist_info = playlists_db.get(active_playlist_id)
@@ -378,6 +343,7 @@ def main():
             
             # --- Playlist-Ladeblock ---
             full_playlist = []
+            missing_or_broken_videos = []
             print(_("--- Überprüfe Videodateien via ID-System ---"))
             
             lines = [line for line in playlist_content.splitlines() if line.strip()]
@@ -393,11 +359,13 @@ def main():
                         
                         if not video_info:
                             print(Fore.YELLOW + _("WARNUNG (Zeile %(line)s): Video-ID '%(id)s' nicht in videos.json gefunden.") % {'line': i+1, 'id': video_id})
+                            missing_or_broken_videos.append(f"Zeile {i+1}: Video-ID '{video_id}' nicht in videos.json gefunden.")
                             continue
 
                         video_path = video_info.get('path')
                         if not video_path or not os.path.exists(video_path):
                             print(Fore.YELLOW + _("WARNUNG (Zeile %(line)s): Videopfad für ID '%(id)s' nicht gefunden: %(path)s") % {'line': i+1, 'id': video_id, 'path': video_path})
+                            missing_or_broken_videos.append(f"Zeile {i+1}: Video-Datei fehlt auf Festplatte (Pfad: {video_path})")
                             continue
                             
                         duration = get_video_duration(video_path)
@@ -408,9 +376,25 @@ def main():
                                 'game': row[2], 
                                 'duration': duration
                             })
+                        else:
+                            print(Fore.YELLOW + _("WARNUNG (Zeile %(line)s): Videodauer ist 0 (defekt oder nicht lesbar): %(path)s") % {'line': i+1, 'path': video_path})
+                            missing_or_broken_videos.append(f"Zeile {i+1}: Datei fehlerhaft / Dauer 0 (Pfad: {video_path})")
                 except Exception as e:
                     print(Fore.YELLOW + _("WARNUNG: Zeile %(line)s in Playlist konnte nicht gelesen werden und wird übersprungen. Fehler: %(error)s") % {'line': i+1, 'error': e})
+                    missing_or_broken_videos.append(f"Zeile {i+1}: Parse-Fehler - {e}")
                     continue
+            
+            # --- Fehlende Videos Report schreiben ---
+            report_path = os.path.join(BASE_DIR, 'missing_videos_report.txt')
+            try:
+                with open(report_path, 'w', encoding='utf-8') as rep_f:
+                    if missing_or_broken_videos:
+                        rep_f.write("=== FEHLENDE ODER DEFEKTE VIDEOS ===\n")
+                        rep_f.write("\n".join(missing_or_broken_videos))
+                    else:
+                        rep_f.write("=== ALLE VIDEOS WURDEN ERFOLGREICH GEFUNDEN ===\n")
+            except Exception as e:
+                print(Fore.RED + f"Fehler beim Erstellen des Reports: {e}")
             
             if resume_index >= len(full_playlist): resume_index = 0
             playlist_for_ffmpeg = full_playlist[resume_index:] + full_playlist[:resume_index]
@@ -429,6 +413,20 @@ def main():
                     clean_path_escaped = clean_path.replace("'", "'\\''")
                     f.write(f"file '{clean_path_escaped}'\n")
                     
+            # --- VORAB METADATEN SENDEN ---
+            try:
+                first_video = playlist_for_ffmpeg[0]
+                manager_config_live = {}
+                try:
+                    with open('manager_config.json', 'r', encoding='utf-8') as f: manager_config_live = json.load(f)
+                except Exception: pass
+                prefix = manager_config_live.get('title_prefix', '')
+                full_title = f"{prefix} | {first_video['title']}" if prefix else first_video['title']
+                print(Fore.CYAN + _("--- Bereite Live-Plattformen VOR Stream-Start vor (API-Calls)... ---"))
+                update_all_platforms(full_title.strip(), first_video['game'].strip(), manager_config_live.get('language', 'de'))
+            except Exception as e:
+                print(Fore.RED + _("Fehler bei der Vorab-Metadaten-Aktualisierung: ") + str(e))
+
             if ffmpeg_process and ffmpeg_process.poll() is None: ffmpeg_process.terminate(); ffmpeg_process.wait()
             ffmpeg_process = run_stream(ffmpeg_playlist_file)
             
@@ -438,6 +436,8 @@ def main():
             reader_thread.start()
 
             currently_playing_video_path = None
+            initial_metadata_sent = True
+
             
             # --- Überwachungsschleife ---
             while True:
@@ -531,7 +531,12 @@ def main():
                     
                     prefix = manager_config_live.get('title_prefix', '')
                     full_title = f"{prefix} | {video['title']}" if prefix else video['title']
-                    update_stream_info(full_title.strip(), video['game'].strip(), manager_config_live.get('language', 'de'))
+                    
+                    if initial_metadata_sent:
+                        initial_metadata_sent = False
+                        print(Fore.GREEN + _("--- Vorab-Metadaten aktiv. API-Call beim ersten Video uebersprungen. ---"))
+                    else:
+                        update_all_platforms(full_title.strip(), video['game'].strip(), manager_config_live.get('language', 'de'))
                     
                     overlay_prefix = manager_config_live.get('overlay_prefix', 'Now Playing:')
                     overlay_text = f"{overlay_prefix} {video['title']}".strip()
